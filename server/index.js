@@ -20,6 +20,9 @@ const server = http.createServer(app);
 initSocket(server);
 const PORT = process.env.PORT || 5000;
 
+// ── Trust Render / Vercel proxy (required for express-rate-limit on deployment)
+app.set('trust proxy', 1);
+
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json());
