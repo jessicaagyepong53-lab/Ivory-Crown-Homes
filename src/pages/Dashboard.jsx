@@ -1,8 +1,27 @@
+import { useState } from "react";
 import { C } from "../constants/colors";
 import { fmt, fmtDate } from "../utils/formatters";
-import { getReminderStatus } from "../utils/helpers";
+import { getReminderStatus, today } from "../utils/helpers";
 import Badge from "../components/ui/Badge";
 import { card, cTitle, th, td, sGrid } from "../styles/shared";
+
+// Cap at leaseEnd so rent paid never exceeds the agreed lease term
+function monthsElapsed(start, end) {
+  if (!start) return 0;
+  const s   = new Date(start);
+  const cap = end ? new Date(Math.min(new Date(end), today)) : today;
+  return Math.max(0, (cap.getFullYear() - s.getFullYear()) * 12 + (cap.getMonth() - s.getMonth()));
+}
+
+function calcUnit(u, maint) {
+  const a        = u.tenants.find((t) => t.leaseStatus === "active");
+  const months   = a ? monthsElapsed(a.leaseStart, a.leaseEnd) : 0;
+  const rentPaid = months * u.monthlyRent;
+  const depAmt   = a ? (a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent) : 0;
+  const depPaid  = a?.depositPaid ? depAmt : 0;
+  const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
+  return { a, months, rentPaid, depPaid, maintCost };
+}
 
 function StatCard({ label, val, accent, accentBg }) {
   return (
@@ -15,58 +34,176 @@ function StatCard({ label, val, accent, accentBg }) {
   );
 }
 
-export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, maint, dueSoonCount, overdueCount, reminderUnits }) {
+const selSt = {
+  background: C.deep, border: `1px solid ${C.border}`, borderRadius: 8,
+  padding: "8px 12px", color: C.text, fontSize: 13, fontFamily: "Georgia,serif", cursor: "pointer",
+};
+
+export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, maint, dueSoonCount, overdueCount, reminderUnits, totalRentPaid, totalDepHeld }) {
+  const [filterBlock, setFilterBlock] = useState("");
+  const [filterUnit,  setFilterUnit]  = useState("");
+
+  const blockUnits  = filterBlock ? allUnits.filter((u) => u.blockId === filterBlock) : allUnits;
+  const scopeUnits  = filterUnit  ? blockUnits.filter((u) => u.uid === filterUnit)    : blockUnits;
+
+  function onBlockChange(bid) { setFilterBlock(bid); setFilterUnit(""); }
+
+  const scopeTotals = scopeUnits.reduce((acc, u) => {
+    const { rentPaid, depPaid, maintCost } = calcUnit(u, maint);
+    return { rentPaid: acc.rentPaid + rentPaid, depPaid: acc.depPaid + depPaid, maintCost: acc.maintCost + maintCost };
+  }, { rentPaid: 0, depPaid: 0, maintCost: 0 });
+
+  const scopeLabel = filterUnit
+    ? allUnits.find((u) => u.uid === filterUnit)?.name
+    : filterBlock
+    ? blocks.find((b) => b.bid === filterBlock)?.name
+    : "All Properties";
+
   return (
     <>
+      {/* ── Global stat cards ── */}
       <div className="stat-grid" style={sGrid}>
-        <StatCard label="Monthly Revenue"    val={fmt(totalRev)}                                  accent={C.gold}     accentBg={C.goldBg}  />
-        <StatCard label="Annual Revenue"     val={fmt(totalRev * 12)}                             accent={C.sky}      accentBg={C.skyBg}   />
-        <StatCard label="Occupied Units"     val={`${occupiedUnits.length}/${allUnits.length}`}   accent={C.sage}     accentBg={C.sageBg}  />
-        <StatCard label="Blocks / Properties" val={blocks.length}                                 accent={C.lavender} accentBg={C.lavBg}   />
+        <StatCard label="Monthly Revenue"     val={fmt(totalRev)}                                  accent={C.gold}     accentBg={C.goldBg}  />
+        <StatCard label="Annual Revenue"      val={fmt(totalRev * 12)}                             accent={C.sky}      accentBg={C.skyBg}   />
+        <StatCard label="Occupied Units"      val={`${occupiedUnits.length}/${allUnits.length}`}   accent={C.sage}     accentBg={C.sageBg}  />
+        <StatCard label="Blocks / Properties" val={blocks.length}                                  accent={C.lavender} accentBg={C.lavBg}   />
         <StatCard label="Pending Maintenance" val={maint.filter((m) => m.status === "Pending").length} accent={C.rose} accentBg={C.roseBg} />
-        <StatCard label="Lease Alerts (≤30d)" val={dueSoonCount + overdueCount}                   accent={C.amber}    accentBg={C.amberBg} />
+        <StatCard label="Lease Alerts (≤30d)" val={dueSoonCount + overdueCount}                    accent={C.amber}    accentBg={C.amberBg} />
+        <StatCard label="Total Rent Paid"     val={fmt(totalRentPaid)}                             accent={C.teal}     accentBg={C.tealBg}  />
+        <StatCard label="Total Security Deposits" val={fmt(totalDepHeld)}                          accent={C.gold}     accentBg={C.goldBg}  />
       </div>
 
-      {reminderUnits.length > 0 && (
-        <div style={card}>
-          <div style={cTitle}>⚠ Active Lease Reminders</div>
-          <div className="tbl-wrap">
+      {/* ── Financial Breakdown (filterable) ── */}
+      <div style={card}>
+        {/* Header + filters */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
+          <div>
+            <div style={cTitle}>Financial Breakdown</div>
+            <div style={{ fontSize: 12, color: C.muted }}>
+              Viewing: <strong style={{ color: C.text }}>{scopeLabel}</strong>
+              {filterUnit || filterBlock
+                ? <span style={{ marginLeft: 8, color: C.teal, fontSize: 11 }}>({scopeUnits.length} unit{scopeUnits.length !== 1 ? "s" : ""})</span>
+                : <span style={{ marginLeft: 8, color: C.muted, fontSize: 11 }}>({allUnits.length} units across {blocks.length} properties)</span>
+              }
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={filterBlock} onChange={(e) => onBlockChange(e.target.value)} style={selSt}>
+              <option value="">All Blocks / Properties</option>
+              {blocks.map((b) => <option key={b.bid} value={b.bid}>{b.name}</option>)}
+            </select>
+            <select value={filterUnit} onChange={(e) => setFilterUnit(e.target.value)} style={{ ...selSt, opacity: filterBlock ? 1 : 0.45 }} disabled={!filterBlock}>
+              <option value="">All Units</option>
+              {blockUnits.map((u) => <option key={u.uid} value={u.uid}>{u.name}</option>)}
+            </select>
+            {(filterBlock || filterUnit) && (
+              <button onClick={() => { setFilterBlock(""); setFilterUnit(""); }}
+                style={{ ...selSt, background: C.roseBg, color: C.rose, border: `1px solid ${C.rose}44` }}>
+                ✕ Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Scope summary cards */}
+        <div className="stat-grid" style={{ ...sGrid, marginBottom: 20 }}>
+          <StatCard label="Rent Paid"        val={fmt(scopeTotals.rentPaid)}                          accent={C.teal}  accentBg={C.tealBg}  />
+          <StatCard label="Security Deposits"     val={fmt(scopeTotals.depPaid)}                        accent={C.gold}  accentBg={C.goldBg}  />
+          <StatCard label="Rent + Security Deposit" val={fmt(scopeTotals.rentPaid + scopeTotals.depPaid)} accent={C.sky}   accentBg={C.skyBg}   />
+          <StatCard label="Maintenance Cost" val={fmt(scopeTotals.maintCost)}                         accent={C.rose}  accentBg={C.roseBg}  />
+        </div>
+
+        {/* Breakdown table */}
+        <div className="tbl-wrap">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={th}>Location</th>
+                <th style={th}>Block / Unit</th>
                 <th style={th}>Tenant</th>
-                <th style={th}>Lease End</th>
-                <th style={th}>Alert</th>
-                <th style={th}>Rent</th>
+                <th style={th}>Monthly Rent</th>
+                <th style={th}>Rent Paid</th>
+                <th style={th}>Security Deposit</th>
+                <th style={th}>Rent + Sec. Deposit</th>
+                <th style={th}>Maint Cost</th>
               </tr>
             </thead>
             <tbody>
-              {reminderUnits.map((u) => {
-                const a  = u.tenants.find((t) => t.leaseStatus === "active");
-                const rs = getReminderStatus(a.leaseEnd);
+              {scopeUnits.length === 0 && (
+                <tr><td colSpan={7} style={{ ...td, textAlign: "center", color: C.muted, padding: 28 }}>No units match the selected filter.</td></tr>
+              )}
+              {scopeUnits.map((u) => {
+                const { a, rentPaid, depPaid, maintCost } = calcUnit(u, maint);
                 return (
                   <tr key={u.uid}>
-                    <td style={td}><b>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
-                    <td style={td}>{a.name}</td>
-                    <td style={td}>{fmtDate(a.leaseEnd)}</td>
-                    <td style={td}>{rs && <Badge label={rs.label} color={rs.color} bg={rs.bg} />}</td>
+                    <td style={td}><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
+                    <td style={td}>{a ? a.name : <span style={{ color: C.faint, fontStyle: "italic" }}>Vacant</span>}</td>
                     <td style={td}>{fmt(u.monthlyRent)}</td>
+                    <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{fmt(rentPaid)}</td>
+                    <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
+                    <td style={{ ...td, fontWeight: 600 }}>{fmt(rentPaid + depPaid)}</td>
+                    <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{maintCost > 0 ? fmt(maintCost) : "—"}</td>
                   </tr>
                 );
               })}
             </tbody>
+            {scopeUnits.length > 1 && (
+              <tfoot>
+                <tr style={{ background: C.panel }}>
+                  <td style={{ ...td, fontWeight: 700, color: C.text }} colSpan={2}>Totals</td>
+                  <td style={{ ...td, fontWeight: 700 }}>{fmt(scopeUnits.reduce((s, u) => s + u.monthlyRent, 0))}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.teal }}>{fmt(scopeTotals.rentPaid)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.gold }}>{fmt(scopeTotals.depPaid)}</td>
+                  <td style={{ ...td, fontWeight: 700 }}>{fmt(scopeTotals.rentPaid + scopeTotals.depPaid)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.rose }}>{scopeTotals.maintCost > 0 ? fmt(scopeTotals.maintCost) : "—"}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
+        </div>
+      </div>
+
+      {/* ── Lease Reminders ── */}
+      {reminderUnits.length > 0 && (
+        <div style={card}>
+          <div style={cTitle}>⚠ Active Lease Reminders</div>
+          <div className="tbl-wrap">
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={th}>Location</th>
+                  <th style={th}>Tenant</th>
+                  <th style={th}>Lease End</th>
+                  <th style={th}>Alert</th>
+                  <th style={th}>Rent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reminderUnits.map((u) => {
+                  const a  = u.tenants.find((t) => t.leaseStatus === "active");
+                  const rs = getReminderStatus(a.leaseEnd);
+                  return (
+                    <tr key={u.uid}>
+                      <td style={td}><b>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
+                      <td style={td}>{a.name}</td>
+                      <td style={td}>{fmtDate(a.leaseEnd)}</td>
+                      <td style={td}>{rs && <Badge label={rs.label} color={rs.color} bg={rs.bg} />}</td>
+                      <td style={td}>{fmt(u.monthlyRent)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
+      {/* ── Revenue by Block ── */}
       <div style={card}>
         <div style={cTitle}>Revenue by Block / Property</div>
         {blocks.map((b) => {
-          const bRev   = b.units.reduce((s, u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); return s + (a ? u.monthlyRent : 0); }, 0);
-          const bOcc   = b.units.filter((u) => u.tenants.some((t) => t.leaseStatus === "active")).length;
-          const pct    = b.units.length ? Math.round((bOcc / b.units.length) * 100) : 0;
+          const bRev = b.units.reduce((s, u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); return s + (a ? u.monthlyRent : 0); }, 0);
+          const bOcc = b.units.filter((u) => u.tenants.some((t) => t.leaseStatus === "active")).length;
+          const pct  = b.units.length ? Math.round((bOcc / b.units.length) * 100) : 0;
           const barCol = pct === 100 ? C.sage : pct === 0 ? C.faint : C.teal;
           return (
             <div key={b.bid} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 0", borderBottom: `1px solid ${C.borderLight}` }}>

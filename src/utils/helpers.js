@@ -37,3 +37,11 @@ export function fileIcon(type, name) {
   if (["xls", "xlsx"].includes(ext))          return { icon: "📊", bg: "#e8f5ee" };
   return { icon: "📎", bg: "#fff3e0" };
 }
+
+// Returns the effective display status of a tenant.
+// A tenant stored as 'active' whose leaseEnd is in the past is shown as 'expired'.
+export function getLeaseStatus(tenant) {
+  if (tenant.leaseStatus !== 'active') return tenant.leaseStatus;
+  if (tenant.leaseEnd && new Date(tenant.leaseEnd) < today) return 'expired';
+  return 'active';
+}

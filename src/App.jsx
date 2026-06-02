@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
+import { io } from "socket.io-client";
 import { C } from "./constants/colors";
 import { TABS } from "./constants/options";
 import { fmt } from "./utils/formatters";
-import { today, yr, daysUntil } from "./utils/helpers";
+import { today, yr, daysUntil, getLeaseStatus } from "./utils/helpers";
 import { fetchBlocks, createBlock, deleteBlock as apiDeleteBlock, addUnit as apiAddUnit, deleteUnit as apiDeleteUnit, addTenant as apiAddTenant, updateTenant as apiUpdateTenant } from "./api/blocks.js";
 import { fetchMaintenance, createMaintenance, updateMaintenance as apiUpdateMaintenance } from "./api/maintenance.js";
 import { verifyToken, logout as apiLogout } from "./api/auth.js";
 import LoadingSpinner   from "./components/LoadingSpinner.jsx";
+import NotificationBell from "./components/NotificationBell.jsx";
 import LoginPage        from "./pages/LoginPage";
 import Dashboard        from "./pages/Dashboard";
 import Properties       from "./pages/Properties";
@@ -47,21 +49,51 @@ export default function App() {
       try { await verifyToken(); setIsAuthenticated(true); } catch { /* no valid token */ }
     }
     init();
+
+    // ── Real-time sync ─────────────────────────────────────────────────────
+    const socket = io('/');
+    socket.on('blocks:changed', async () => {
+      try { setBlocks(await fetchBlocks()); } catch { /* network hiccup */ }
+    });
+    socket.on('maintenance:changed', async () => {
+      try { setMaint(await fetchMaintenance()); } catch { /* network hiccup */ }
+    });
+
     function onExpired() { setIsAuthenticated(false); }
     window.addEventListener("auth:expired", onExpired);
-    return () => window.removeEventListener("auth:expired", onExpired);
+    return () => {
+      socket.disconnect();
+      window.removeEventListener("auth:expired", onExpired);
+    };
   }, []);
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const allUnits = blocks.flatMap((b) => b.units.map((u) => ({ ...u, blockId: b.bid, blockName: b.name })));
   const allTenants = allUnits.flatMap((u) => u.tenants.map((t) => ({ ...t, unitId: u.uid, unitName: u.name, blockName: u.blockName, monthlyRent: u.monthlyRent })));
-  const activeTenants  = allTenants.filter((t) => t.leaseStatus === "active");
-  const occupiedUnits  = allUnits.filter((u) => u.tenants.some((t) => t.leaseStatus === "active"));
-  const totalRev       = occupiedUnits.reduce((s, u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); return s + (a ? u.monthlyRent : 0); }, 0);
+  // Use getLeaseStatus so tenants with a past leaseEnd are treated as expired, not active
+  const activeTenants  = allTenants.filter((t) => getLeaseStatus(t) === "active");
+  const occupiedUnits  = allUnits.filter((u) => u.tenants.some((t) => getLeaseStatus(t) === "active"));
+  const expiredUnits   = allUnits.filter((u) => !u.tenants.some((t) => getLeaseStatus(t) === "active") && u.tenants.some((t) => t.leaseStatus === "active"));
+  const totalRev       = occupiedUnits.reduce((s, u) => { const a = u.tenants.find((t) => getLeaseStatus(t) === "active"); return s + (a ? u.monthlyRent : 0); }, 0);
   const allYears       = [...new Set(allTenants.flatMap((t) => [yr(t.leaseStart), yr(t.leaseEnd), yr(t.cancelDate)]).filter(Boolean))].sort();
-  const reminderUnits  = allUnits.filter((u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); return a && daysUntil(a.leaseEnd) <= 90 && daysUntil(a.leaseEnd) >= -30; });
-  const dueSoonCount   = allUnits.filter((u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); const d = a ? daysUntil(a.leaseEnd) : null; return d !== null && d >= 0 && d <= 30; }).length;
-  const overdueCount   = allUnits.filter((u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); return a && daysUntil(a.leaseEnd) < 0; }).length;
+  const reminderUnits  = allUnits.filter((u) => { const a = u.tenants.find((t) => getLeaseStatus(t) === "active"); return a && daysUntil(a.leaseEnd) !== null && daysUntil(a.leaseEnd) <= 90; });
+  const dueSoonCount   = allUnits.filter((u) => { const a = u.tenants.find((t) => getLeaseStatus(t) === "active"); const d = a ? daysUntil(a.leaseEnd) : null; return d !== null && d >= 0 && d <= 30; }).length;
+  const overdueCount   = expiredUnits.length;
+
+  // Security deposit totals (mirrors SecurityDeposits page calculation)
+  const totalDepHeld = occupiedUnits.reduce((s, u) => {
+    const a = u.tenants.find((t) => getLeaseStatus(t) === "active");
+    if (!a || !a.depositPaid) return s;
+    return s + (a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent);
+  }, 0);
+  const totalRentPaid = occupiedUnits.reduce((s, u) => {
+    const a = u.tenants.find((t) => getLeaseStatus(t) === "active");
+    if (!a || !a.leaseStart) return s;
+    const start = new Date(a.leaseStart);
+    const cap   = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
+    const months = Math.max(0, (cap.getFullYear() - start.getFullYear()) * 12 + (cap.getMonth() - start.getMonth()));
+    return s + months * u.monthlyRent;
+  }, 0);
 
   const filteredTenants = allTenants.filter((t) => {
     if (!filterYA) return true;
@@ -88,6 +120,10 @@ export default function App() {
     setBlocks((prev) => prev.map((b) => b.bid === block.bid ? block : b));
   }
 
+  function handleRenew(block) {
+    setBlocks((prev) => prev.map((b) => b.bid === block.bid ? block : b));
+  }
+
   async function addTenant(unitId, tenant) {
     const block = await apiAddTenant(unitId, tenant);
     setBlocks((prev) => prev.map((b) => b.bid === block.bid ? block : b));
@@ -109,7 +145,7 @@ export default function App() {
   }
 
   async function addBlock(block) {
-    const created = await createBlock({ name: block.name, type: block.type });
+    const created = await createBlock({ name: block.name, type: block.type, address: block.address || "" });
     setBlocks((prev) => [...prev, created]);
   }
 
@@ -223,11 +259,12 @@ export default function App() {
             <div className="header-subtitle" style={{ fontSize: 11, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 2 }}>Property Management System</div>
           </div>
         </div>
-        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className="header-date" style={{ textAlign: "right", fontSize: 12, color: C.muted }}>
             <div>{today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
             <div style={{ color: C.teal, marginTop: 2, fontWeight: 600 }}>{occupiedUnits.length}/{allUnits.length} Units Occupied</div>
           </div>
+          <NotificationBell allUnits={allUnits} />
           {isAuthenticated ? (
             <button
               onClick={() => { if (window.confirm("Log out of Ivory Crown Homes?")) { apiLogout(); setIsAuthenticated(false); } }}
@@ -269,6 +306,8 @@ export default function App() {
             dueSoonCount={dueSoonCount}
             overdueCount={overdueCount}
             reminderUnits={reminderUnits}
+            totalRentPaid={totalRentPaid}
+            totalDepHeld={totalDepHeld}
           />
         )}
 
@@ -283,6 +322,7 @@ export default function App() {
             onDeleteUnit={withAuth(deleteUnit)}
             onDeleteBlock={withAuth(deleteBlock)}
             onAddBlock={withAuth(addBlock)}
+            onRenew={handleRenew}
           />
         )}
 
@@ -324,7 +364,7 @@ export default function App() {
           />
         )}
 
-        {tab === "Settings" && <Settings />}
+        {tab === "Settings" && <Settings requireAuth={requireAuth} isAuthenticated={isAuthenticated} />}
       </div>
     </div>
   );

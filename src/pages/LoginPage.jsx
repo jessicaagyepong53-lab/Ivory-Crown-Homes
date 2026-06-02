@@ -53,9 +53,8 @@ export default function LoginPage({ onLogin, onCancel }) {
     }
   }
 
-  // Show up to 8 dots: filled = entered, empty = remaining
-  const MAX_DOTS = 8;
-  const dots = Array.from({ length: MAX_DOTS }, (_, i) => i < entered.length);
+  // Show exactly as many dots as digits entered
+  const dots = Array.from({ length: entered.length }, (_, i) => i < entered.length);
 
   const content = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "Georgia,serif", padding: 24 }}>

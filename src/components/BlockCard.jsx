@@ -3,19 +3,20 @@ import { C } from "../constants/colors";
 import { UNIT_TYPES } from "../constants/options";
 import { iSt, lSt } from "../styles/shared";
 import { fmt } from "../utils/formatters";
+import { getLeaseStatus } from "../utils/helpers";
 import Btn from "./ui/Btn";
 import Badge from "./ui/Badge";
 import SLabel from "./ui/SLabel";
 import UnitPanel from "./UnitPanel";
 
-export default function BlockCard({ block, requireAuth, onEndLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock }) {
+export default function BlockCard({ block, requireAuth, onEndLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onRenew }) {
   const [open, setOpen] = useState(false);
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newU, setNewU] = useState({ name: "", type: "1-Bedroom", monthlyRent: "" });
 
-  const occ    = block.units.filter((u) => u.tenants.some((t) => t.leaseStatus === "active")).length;
+  const occ    = block.units.filter((u) => u.tenants.some((t) => getLeaseStatus(t) === "active")).length;
   const total  = block.units.length;
-  const rev    = block.units.reduce((s, u) => { const a = u.tenants.find((t) => t.leaseStatus === "active"); return s + (a ? u.monthlyRent : 0); }, 0);
+  const rev    = block.units.reduce((s, u) => { const a = u.tenants.find((t) => getLeaseStatus(t) === "active"); return s + (a ? u.monthlyRent : 0); }, 0);
   const occPct = total ? Math.round((occ / total) * 100) : 0;
 
   function saveUnit() {
@@ -41,6 +42,9 @@ export default function BlockCard({ block, requireAuth, onEndLease, onSaveTenant
           <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>
             {block.name} <span style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>· {total} unit{total !== 1 ? "s" : ""}</span>
           </div>
+          {block.address && (
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>📍 {block.address}</div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
             <div style={{ flex: 1, height: 5, background: C.borderLight, borderRadius: 3, overflow: "hidden", maxWidth: 160 }}>
               <div style={{ width: `${occPct}%`, height: "100%", background: accentColor, borderRadius: 3, transition: "width 0.4s" }} />
@@ -102,6 +106,7 @@ export default function BlockCard({ block, requireAuth, onEndLease, onSaveTenant
                 onSaveTenant={onSaveTenant}
                 onAddTenant={onAddTenant}
                 onDeleteUnit={onDeleteUnit}
+                onRenew={onRenew}
               />
             ))
           )}

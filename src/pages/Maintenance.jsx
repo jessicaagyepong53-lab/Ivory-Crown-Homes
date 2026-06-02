@@ -113,7 +113,7 @@ export default function Maintenance({ maint, blocks, allUnits, requireAuth, onUp
                 <label style={lSt}>Unit</label>
                 <select style={iSt} value={newMaint.unitId} onChange={(e) => setNewMaint((p) => ({ ...p, unitId: e.target.value }))}>
                   <option value="">Select unit...</option>
-                  {filteredUnits.map((u) => <option key={u.uid} value={u.uid}>{u.name}</option>)}
+                  {filteredUnits.map((u) => <option key={u.uid} value={u.uid}>{newMaint.blockId ? u.name : `${u.blockName} / ${u.name}`}</option>)}
                 </select>
               </div>
               <div>

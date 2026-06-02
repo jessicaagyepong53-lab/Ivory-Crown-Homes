@@ -11,4 +11,5 @@ export const deleteUnit    = (uid)       => API.delete(`/units/${uid}`).then(r =
 
 export const addTenant     = (uid, data) => API.post(`/units/${uid}/tenants`, data).then(r => r.data);
 export const updateTenant  = (tid, data) => API.put(`/tenants/${tid}`, data).then(r => r.data);
+export const renewTenant   = (tid, data) => API.post(`/tenants/${tid}/renew`, data).then(r => r.data);
 export const deleteTenant  = (tid)       => API.delete(`/tenants/${tid}`).then(r => r.data);

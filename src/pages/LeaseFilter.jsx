@@ -1,7 +1,7 @@
 import { C } from "../constants/colors";
 import { iSt, lSt, card, cTitle, th, td } from "../styles/shared";
 import { fmt, fmtDate } from "../utils/formatters";
-import { yr } from "../utils/helpers";
+import { yr, getLeaseStatus } from "../utils/helpers";
 import Badge from "../components/ui/Badge";
 import Avatar from "../components/ui/Avatar";
 import Btn from "../components/ui/Btn";
@@ -91,7 +91,9 @@ export default function LeaseFilter({ allTenants, filteredTenants, allYears, fil
             </thead>
             <tbody>
               {filteredTenants.map((t) => {
-                const sc = t.leaseStatus === "active" ? [C.sage, C.sageBg] : t.leaseStatus === "cancelled" ? [C.rose, C.roseBg] : [C.muted, "#f5f0eb"];
+                const eff = getLeaseStatus(t);
+                const sc = eff === "active" ? [C.sage, C.sageBg] : eff === "expired" ? [C.amber, C.amberBg] : t.leaseStatus === "cancelled" ? [C.rose, C.roseBg] : [C.muted, "#f5f0eb"];
+                const label = eff === "active" ? "Active" : eff === "expired" ? "Expired" : t.leaseStatus === "cancelled" ? "Cancelled" : "Ended";
                 const sy = yr(t.leaseStart), ey = yr(t.leaseEnd || t.cancelDate);
                 const pl = sy && ey && sy !== ey ? `${sy}–${ey}` : sy ? `${sy}` : "—";
                 return (
@@ -99,7 +101,7 @@ export default function LeaseFilter({ allTenants, filteredTenants, allYears, fil
                     <td style={td}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar name={t.name} size={28} /><span style={{ fontWeight: 600 }}>{t.name}</span></div></td>
                     <td style={td}><span style={{ color: C.muted }}>{t.blockName}</span> / {t.unitName}</td>
                     <td style={td}>{fmtDate(t.leaseStart)} → {fmtDate(t.leaseEnd || t.cancelDate)}</td>
-                    <td style={td}><Badge label={t.leaseStatus === "active" ? "Active" : t.leaseStatus === "cancelled" ? "Cancelled" : "Ended"} color={sc[0]} bg={sc[1]} /></td>
+                    <td style={td}><Badge label={label} color={sc[0]} bg={sc[1]} /></td>
                     <td style={td}>{fmt(t.monthlyRent)}</td>
                     <td style={td}><Badge label={pl} color={C.lavender} bg={C.lavBg} /></td>
                   </tr>

@@ -18,10 +18,11 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
 
   const activeRows = allUnits.filter((u) => u.tenants.some((t) => t.leaseStatus === "active"));
 
-  // Per-row calculations
+  // Per-row calculations — cap at leaseEnd so rent paid never exceeds the lease term
   function rowCalc(u, a) {
     const depAmt   = a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent;
-    const months   = monthsElapsed(a.leaseStart, today);
+    const cap      = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
+    const months   = monthsElapsed(a.leaseStart, cap);
     const rentPaid = months * u.monthlyRent;
     const depPaid  = a.depositPaid ? depAmt : 0;
     const total    = rentPaid + depPaid;
@@ -66,10 +67,10 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
       {/* Summary cards */}
       <div className="stat-grid" style={sGrid}>
         {[
-          { l: "Deposits Held",   v: fmt(totalDepHeld),  a: C.gold,  ab: C.goldBg  },
+          { l: "Security Deposits Held",   v: fmt(totalDepHeld),  a: C.gold,  ab: C.goldBg  },
           { l: "Rent Collected",  v: fmt(totalRentPaid), a: C.teal,  ab: C.tealBg  },
-          { l: "Deposits — Paid", v: collected,          a: C.sage,  ab: C.sageBg  },
-          { l: "Deposits — Due",  v: pending,            a: C.rose,  ab: C.roseBg  },
+          { l: "Security Deposits — Paid", v: collected,          a: C.sage,  ab: C.sageBg  },
+          { l: "Security Deposits — Due",  v: pending,            a: C.rose,  ab: C.roseBg  },
         ].map((s) => (
           <div key={s.l} style={{ background: C.surface, border: `1px solid ${s.a}55`, borderRadius: 12, padding: "17px 21px", position: "relative", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
             <div style={{ position: "absolute", top: 0, left: 0, width: 4, height: "100%", background: s.a }} />

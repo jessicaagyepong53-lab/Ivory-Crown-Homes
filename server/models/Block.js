@@ -8,14 +8,24 @@ const DocumentSchema = new Schema({
   size:         Number,
   category:     { type: String, default: 'Other' },
   note:         String,
+  leasePeriod:  String, // e.g. "2025–2026" — auto-set on upload
   cloudinaryId: String,
   url:          String,
   uploadedAt:   { type: Date, default: Date.now },
 }, { _id: true });
 
+const LeaseHistorySchema = new Schema({
+  leaseStart:    String,
+  leaseEnd:      String,
+  depositPaid:   Boolean,
+  depositAmount: Number,
+  renewedAt:     String, // date the renewal was processed
+}, { _id: false });
+
 const TenantSchema = new Schema({
   name:              String,
   phone:             String,
+  address:           String,
   email:             String,
   leaseStatus:       { type: String, enum: ['active', 'ended', 'cancelled'], default: 'active' },
   leaseStart:        String,
@@ -35,6 +45,7 @@ const TenantSchema = new Schema({
   emergencyRelation: String,
   vehicles:          String,
   notes:             String,
+  leaseHistory:      [LeaseHistorySchema], // archived previous lease periods
   documents:         [DocumentSchema],
 }, { _id: true });
 
@@ -46,8 +57,9 @@ const UnitSchema = new Schema({
 }, { _id: true });
 
 const BlockSchema = new Schema({
-  name: { type: String, required: true },
-  type: { type: String, enum: ['block', 'standalone'], default: 'block' },
+  name:    { type: String, required: true },
+  address: { type: String, default: '' },
+  type:    { type: String, enum: ['block', 'standalone'], default: 'block' },
   units: [UnitSchema],
 }, { timestamps: true });
 

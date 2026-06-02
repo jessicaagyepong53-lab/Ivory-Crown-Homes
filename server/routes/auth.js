@@ -30,8 +30,8 @@ router.get('/auth/verify', verifyJWT, (req, res) => {
   res.json({ ok: true });
 });
 
-// PUT /api/auth/pin — change PIN (requires auth)
-router.put('/auth/pin', verifyJWT, async (req, res, next) => {
+// PUT /api/auth/pin — change PIN (no auth required — Settings page acts as reset)
+router.put('/auth/pin', async (req, res, next) => {
   try {
     const { pin } = req.body;
     if (!pin || typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {

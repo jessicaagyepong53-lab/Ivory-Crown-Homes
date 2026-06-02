@@ -2,6 +2,7 @@ import express from 'express';
 import Maintenance from '../models/Maintenance.js';
 import { txMaint } from '../utils/transform.js';
 import { verifyJWT } from '../middleware/auth.js';
+import { broadcast } from '../socket.js';
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.post('/maintenance', verifyJWT, async (req, res, next) => {
   try {
     const entry = await Maintenance.create(req.body);
     res.status(201).json(txMaint(entry));
+    broadcast('maintenance:changed', null);
   } catch (err) { next(err); }
 });
 
@@ -27,6 +29,7 @@ router.put('/maintenance/:id', verifyJWT, async (req, res, next) => {
     const entry = await Maintenance.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!entry) return res.status(404).json({ error: 'Entry not found' });
     res.json(txMaint(entry));
+    broadcast('maintenance:changed', null);
   } catch (err) { next(err); }
 });
 

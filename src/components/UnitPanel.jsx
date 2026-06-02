@@ -3,7 +3,7 @@ import { C } from "../constants/colors";
 import { UNIT_TYPES } from "../constants/options";
 import { iSt, lSt } from "../styles/shared";
 import { fmt, fmtDate } from "../utils/formatters";
-import { daysUntil, getReminderStatus } from "../utils/helpers";
+import { daysUntil, getReminderStatus, getLeaseStatus } from "../utils/helpers";
 import Btn from "./ui/Btn";
 import Badge from "./ui/Badge";
 import SLabel from "./ui/SLabel";
@@ -11,20 +11,29 @@ import Divider from "./ui/Divider";
 import TenantRow from "./TenantRow";
 
 const emptyNewT = {
-  name: "", phone: "", email: "", leaseStart: "", leaseEnd: "",
+  name: "", phone: "", address: "", email: "", leaseStart: "", leaseEnd: "",
   idType: "Ghana Card", idNumber: "", occupation: "", employer: "",
   dob: "", emergencyName: "", emergencyPhone: "", emergencyRelation: "",
   vehicles: "", notes: "", depositPaid: false, depositAmount: "", documents: [],
 };
 
-export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant, onAddTenant, onDeleteUnit }) {
+export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant, onAddTenant, onDeleteUnit, onRenew }) {
   const [open, setOpen] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newT, setNewT] = useState(emptyNewT);
 
-  const active = unit.tenants.filter((t) => t.leaseStatus === "active").slice(-1)[0];
-  const past   = unit.tenants.filter((t) => t.leaseStatus !== "active");
-  const rs     = active ? getReminderStatus(active.leaseEnd) : null;
+
+  const active    = unit.tenants.filter((t) => t.leaseStatus === "active").slice(-1)[0];
+  const past       = unit.tenants.filter((t) => t.leaseStatus !== "active");
+  const isExpired  = active ? getLeaseStatus(active) === 'expired' : false;
+  const rs         = active && !isExpired ? getReminderStatus(active.leaseEnd) : null;
+
+  // colours driven by state: teal=occupied, amber=expired, coral=vacant
+  const stateColor = active ? (isExpired ? C.amber  : C.teal)  : C.coral;
+  const stateBg    = active ? (isExpired ? C.amberBg : "#fafffe") : "#fff9f7";
+  const stateDot   = active ? (isExpired ? C.amber  : C.sage)  : C.coral;
+  const stateLabel = active ? (isExpired ? "Expired" : "Occupied") : "Vacant";
+  const stateLBg   = active ? (isExpired ? C.amberBg : C.sageBg) : C.coralBg;
 
   function saveNew() {
     if (!newT.name || !newT.leaseStart) return;
@@ -34,12 +43,12 @@ export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant,
   }
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${active ? C.teal + "44" : C.coral + "44"}`, borderRadius: 10, marginBottom: 8, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+    <div style={{ background: C.surface, border: `1px solid ${stateColor}44`, borderRadius: 10, marginBottom: 8, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
 
       {/* Unit header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: active ? "#fafffe" : "#fff9f7" }} onClick={() => setOpen((o) => !o)}>
-        <div style={{ width: 42, height: 42, borderRadius: 8, background: active ? C.sageBg : C.coralBg, border: `2px solid ${active ? C.sage + "55" : C.coral + "55"}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: active ? C.sage : C.coral, lineHeight: 1.1, textAlign: "center" }}>{unit.name.split(" ").slice(-1)[0]}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: stateBg }} onClick={() => setOpen((o) => !o)}>
+        <div style={{ width: 42, height: 42, borderRadius: 8, background: stateLBg, border: `2px solid ${stateColor}55`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: stateColor, lineHeight: 1.1, textAlign: "center" }}>{unit.name.split(" ").slice(-1)[0]}</span>
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>
@@ -47,14 +56,14 @@ export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant,
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
             {active
-              ? <><span style={{ color: C.sage, fontWeight: 600 }}>● {active.name}</span>{past.length > 0 && <span style={{ color: C.faint, marginLeft: 8 }}>+{past.length} previous</span>}</>
+              ? <><span style={{ color: stateDot, fontWeight: 600 }}>● {active.name}</span>{past.length > 0 && <span style={{ color: C.faint, marginLeft: 8 }}>+{past.length} previous</span>}{isExpired && <span style={{ color: C.amber, marginLeft: 8, fontSize: 11 }}>⚠️ Lease expired</span>}</>
               : <span style={{ color: C.coral, fontWeight: 600 }}>● Vacant</span>
             }
           </div>
         </div>
         <div style={{ display: "flex", gap: 7, alignItems: "center", flexShrink: 0 }}>
           {active && rs && <Badge label={rs.label} color={rs.color} bg={rs.bg} />}
-          <Badge label={active ? "Occupied" : "Vacant"} color={active ? C.sage : C.coral} bg={active ? C.sageBg : C.coralBg} />
+          <Badge label={stateLabel} color={stateColor} bg={stateLBg} />
           <span style={{ color: C.muted, fontSize: 15, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>⌄</span>
         </div>
       </div>
@@ -62,9 +71,14 @@ export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant,
       {open && (
         <div style={{ borderTop: `1px solid ${C.borderLight}`, padding: "16px 18px", background: C.deep }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <SLabel>{active ? "Current Tenant" : "No Active Tenant"}</SLabel>
+            <SLabel>{active ? (isExpired ? "Expired Tenant" : "Current Tenant") : "No Active Tenant"}</SLabel>
             <div style={{ display: "flex", gap: 7 }}>
-              {!active && !showAdd && <Btn small onClick={() => requireAuth(() => setShowAdd(true))}>+ Add Tenant</Btn>}
+              {!showAdd && (
+              <Btn small onClick={() => requireAuth(() => {
+                if (active && !window.confirm(`${active.name}'s lease will be ended automatically. Add new tenant?`)) return;
+                setShowAdd(true);
+              })}>+ {active ? 'New Tenant' : 'Add Tenant'}</Btn>
+            )}
               <Btn small variant="ghost" style={{ color: C.rose, borderColor: C.rose + "55" }} onClick={() => { if (window.confirm(`Delete ${unit.name}? This cannot be undone.`)) onDeleteUnit(unit.uid); }}>🗑</Btn>
             </div>
           </div>
@@ -76,6 +90,7 @@ export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant,
               requireAuth={requireAuth}
               onEndLease={(tid, reason, endDate) => onEndLease(unit.uid, tid, reason, endDate)}
               onSave={(u) => onSaveTenant(unit.uid, u)}
+              onRenew={onRenew}
             />
           ) : (
             <div style={{ fontSize: 13, color: C.muted, paddingBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
@@ -91,6 +106,7 @@ export default function UnitPanel({ unit, requireAuth, onEndLease, onSaveTenant,
                 {[
                   { l: "Full Name *",      k: "name"             },
                   { l: "Phone",            k: "phone"            },
+                  { l: "Address",          k: "address"          },
                   { l: "Email",            k: "email",  t: "email" },
                   { l: "Lease Start *",    k: "leaseStart", t: "date" },
                   { l: "Lease End",        k: "leaseEnd",   t: "date" },
