@@ -15,6 +15,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
   const [docViewer,   setDocViewer]   = useState(null); // { url, name, isImg }
   const [uploading,   setUploading]   = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [pdfLoading,  setPdfLoading]  = useState(false);
 
   async function readFiles(files) {
     setUploading(true);
@@ -125,10 +126,26 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                   if (!doc.did) return;
                   const proxyUrl = `${API}/api/documents/${doc.did}/file`;
                   if (isImg) {
-                    setDocViewer({ did: doc.did, url: proxyUrl, name: doc.name, isImg: true });
-                  } else if (isPdf) {
-                    // Fetch as blob so auth token is sent and deployment URL is correct
+                    // Images: fetch as blob → show in modal
                     try {
+                      setPdfLoading(true);
+                      const token = localStorage.getItem("token");
+                      const res = await fetch(proxyUrl, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      });
+                      if (!res.ok) throw new Error("Failed to load image");
+                      const blob = await res.blob();
+                      const blobUrl = URL.createObjectURL(blob);
+                      setDocViewer({ did: doc.did, url: blobUrl, name: doc.name, isImg: true });
+                    } catch {
+                      alert("Could not load image. Please try downloading it instead.");
+                    } finally {
+                      setPdfLoading(false);
+                    }
+                  } else if (isPdf) {
+                    // PDFs: fetch as blob → render in iframe modal (avoids popup blocker)
+                    try {
+                      setPdfLoading(true);
                       const token = localStorage.getItem("token");
                       const res = await fetch(proxyUrl, {
                         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -136,11 +153,14 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                       if (!res.ok) throw new Error("Failed to load PDF");
                       const blob = await res.blob();
                       const blobUrl = URL.createObjectURL(blob);
-                      window.open(blobUrl, "_blank");
+                      setDocViewer({ did: doc.did, url: blobUrl, name: doc.name, isImg: false, iframeUrl: blobUrl });
                     } catch {
                       alert("Could not open PDF. Please try downloading it instead.");
+                    } finally {
+                      setPdfLoading(false);
                     }
                   } else {
+                    // Office docs: use Google Viewer with Cloudinary URL
                     const gdocUrl = doc.url
                       ? `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`
                       : proxyUrl;
@@ -190,7 +210,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                   </div>
                   <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                     {doc.did
-                      ? <button onClick={viewDoc} style={{ background: C.skyBg, border: "none", color: C.sky, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 12 }}>👁 View</button>
+                      ? <button onClick={viewDoc} disabled={pdfLoading} style={{ background: C.skyBg, border: "none", color: C.sky, borderRadius: 6, padding: "4px 9px", cursor: pdfLoading ? "default" : "pointer", fontSize: 12, opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "⏳" : "👁 View"}</button>
                       : <span style={{ fontSize: 11, color: C.rose, background: C.roseBg, border: `1px solid ${C.rose}44`, borderRadius: 6, padding: "4px 8px" }}>⚠ No file — delete & re-upload</span>
                     }
                     {doc.did && <button onClick={downloadDoc} style={{ background: C.sageBg, border: "none", color: C.sage, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 12 }}>⬇</button>}
