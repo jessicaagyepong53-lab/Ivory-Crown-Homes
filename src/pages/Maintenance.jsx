@@ -39,13 +39,13 @@ export default function Maintenance({ maint, blocks, allUnits, requireAuth, onUp
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }} className="page-header">
         <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Maintenance Tracker</div>
         <Btn onClick={() => requireAuth(() => setShowAddMaint(true))}>+ Log Request</Btn>
       </div>
 
       {/* Status summary cards */}
-      <div style={sGrid}>
+      <div className="stat-grid" style={sGrid}>
         {[["Pending", C.amber, C.amberBg], ["In Progress", C.sky, C.skyBg], ["Completed", C.sage, C.sageBg], ["Cancelled", C.muted, "#f5f0eb"]].map(([s, accent, aBg]) => {
           const cnt  = maint.filter((m) => m.status === s).length;
           const cost = maint.filter((m) => m.status === s).reduce((a, m) => a + (m.cost || 0), 0);
@@ -63,6 +63,7 @@ export default function Maintenance({ maint, blocks, allUnits, requireAuth, onUp
 
       {/* Maintenance table */}
       <div style={card}>
+        <div className="tbl-wrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>{["Location", "Type", "Description", "Reported", "Scheduled", "Contractor", "Cost", "Status", "Update"].map((h) => <th key={h} style={th}>{h}</th>)}</tr>
@@ -90,9 +91,9 @@ export default function Maintenance({ maint, blocks, allUnits, requireAuth, onUp
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
-      {/* Add Maintenance Modal */}
       {showAddMaint && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(45,37,32,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}

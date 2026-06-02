@@ -64,7 +64,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
       </p>
 
       {/* Summary cards */}
-      <div style={sGrid}>
+      <div className="stat-grid" style={sGrid}>
         {[
           { l: "Deposits Held",   v: fmt(totalDepHeld),  a: C.gold,  ab: C.goldBg  },
           { l: "Rent Collected",  v: fmt(totalRentPaid), a: C.teal,  ab: C.tealBg  },
@@ -82,6 +82,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
 
       {/* Deposits table */}
       <div style={card}>
+        <div className="tbl-wrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -170,6 +171,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
     </>
   );

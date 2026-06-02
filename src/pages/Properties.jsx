@@ -17,7 +17,7 @@ export default function Properties({ blocks, requireAuth, onEndLease, onSaveTena
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Blocks & Properties</div>
         <Btn onClick={() => requireAuth(() => setShowAddBlock(true))}>+ Add Block / Property</Btn>
       </div>

@@ -84,6 +84,7 @@ export default function LeaseFilter({ allTenants, filteredTenants, allYears, fil
         {filteredTenants.length === 0 ? (
           <div style={{ fontSize: 13, color: C.muted }}>No tenants match this filter.</div>
         ) : (
+          <div className="tbl-wrap">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>{["Tenant", "Block / Unit", "Lease Period", "Status", "Rent", "Period"].map((h) => <th key={h} style={th}>{h}</th>)}</tr>
@@ -106,6 +107,7 @@ export default function LeaseFilter({ allTenants, filteredTenants, allYears, fil
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>

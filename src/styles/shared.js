@@ -64,3 +64,7 @@ export const sGrid = {
   gap: 13,
   marginBottom: 22,
 };
+
+export const sGridClass = "stat-grid";
+export const cardClass  = "app-card";
+export const tblWrap    = { overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" };

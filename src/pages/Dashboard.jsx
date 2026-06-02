@@ -18,7 +18,7 @@ function StatCard({ label, val, accent, accentBg }) {
 export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, maint, dueSoonCount, overdueCount, reminderUnits }) {
   return (
     <>
-      <div style={sGrid}>
+      <div className="stat-grid" style={sGrid}>
         <StatCard label="Monthly Revenue"    val={fmt(totalRev)}                                  accent={C.gold}     accentBg={C.goldBg}  />
         <StatCard label="Annual Revenue"     val={fmt(totalRev * 12)}                             accent={C.sky}      accentBg={C.skyBg}   />
         <StatCard label="Occupied Units"     val={`${occupiedUnits.length}/${allUnits.length}`}   accent={C.sage}     accentBg={C.sageBg}  />
@@ -30,6 +30,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
       {reminderUnits.length > 0 && (
         <div style={card}>
           <div style={cTitle}>⚠ Active Lease Reminders</div>
+          <div className="tbl-wrap">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -56,6 +57,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

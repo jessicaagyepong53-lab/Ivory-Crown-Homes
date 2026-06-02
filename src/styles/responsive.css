@@ -1,0 +1,75 @@
+/* ── Base resets ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+
+/* ── Responsive table wrapper ────────────────────────────────────────────── */
+.tbl-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+}
+
+/* ── Mobile  (≤ 600px) ───────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Header */
+  .app-header {
+    padding: 12px 14px !important;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .header-logo { width: 38px !important; height: 38px !important; border-radius: 10px !important; }
+  .header-title { font-size: 17px !important; }
+  .header-subtitle { display: none; }
+  .header-right { flex-direction: column; align-items: flex-end; gap: 8px !important; }
+  .header-date  { display: none; }
+
+  /* Nav */
+  .app-nav { padding: 0 6px !important; gap: 0 !important; }
+  .app-nav button { padding: 10px 10px !important; font-size: 11px !important; }
+
+  /* Page content */
+  .app-content { padding: 14px 12px !important; }
+
+  /* Stat grid — 2 cols on mobile */
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Cards */
+  .app-card { padding: 16px 12px !important; }
+
+  /* Tables → scrollable */
+  table { min-width: 520px; }
+
+  /* Page headers (title + button row) */
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Block / revenue bar rows */
+  .rev-row { flex-wrap: wrap; gap: 6px !important; }
+  .rev-row .rev-name { min-width: 100% !important; }
+  .rev-row .rev-amt  { min-width: auto !important; }
+
+  /* Modals */
+  .modal-box { width: 96% !important; padding: 20px 16px !important; }
+}
+
+/* ── Tablet  (601px – 900px) ─────────────────────────────────────────────── */
+@media (min-width: 601px) and (max-width: 900px) {
+  .app-header  { padding: 14px 18px !important; }
+  .app-content { padding: 18px 18px !important; }
+  .app-nav button { padding: 11px 12px !important; font-size: 12px !important; }
+
+  /* Stat grid — 3 cols on tablet */
+  .stat-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .header-date { font-size: 11px !important; }
+}
