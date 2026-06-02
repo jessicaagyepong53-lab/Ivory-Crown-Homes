@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: estatepro-server
+    runtime: node
+    buildCommand: npm install --prefix server
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+        # Set this to your Vercel URL in the Render dashboard, e.g. https://your-app.vercel.app
