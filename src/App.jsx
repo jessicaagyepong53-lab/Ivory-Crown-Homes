@@ -162,10 +162,6 @@ export default function App() {
       </div>
     );
   }
-    };
-  }
-  // Call requireAuth(fn) anywhere to guard a UI action (e.g. opening a modal).
-  const requireAuth = (fn) => withAuth(fn)();
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
