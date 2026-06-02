@@ -143,7 +143,7 @@ export default function App() {
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia,serif" }}>
-        <LoadingSpinner message="Loading EstatePro…" />
+        <LoadingSpinner message="Loading Ivory Crown Homes…" />
       </div>
     );
   }
@@ -208,11 +208,20 @@ export default function App() {
 
       {/* Header */}
       <div style={{ background: "linear-gradient(135deg,#fff,#f5f0eb)", borderBottom: `1px solid ${C.border}`, padding: "18px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", color: C.text }}>
-            Estate<span style={{ color: C.teal }}>Pro</span> <span style={{ color: C.gold }}>Manager</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* Crown logo */}
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: `linear-gradient(145deg, ${C.gold}, #b8860b)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.15)", flexShrink: 0 }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 17L5 9L9 13L12 6L15 13L19 9L21 17H3Z" fill="white" stroke="white" strokeWidth="0.5" strokeLinejoin="round"/>
+              <rect x="3" y="18" width="18" height="2.5" rx="1.25" fill="white"/>
+            </svg>
           </div>
-          <div style={{ fontSize: 11, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 2 }}>Property Management System</div>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", color: C.text }}>
+              Ivory <span style={{ color: C.teal }}>Crown</span> <span style={{ color: C.gold }}>Homes</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 2 }}>Property Management System</div>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <div style={{ textAlign: "right", fontSize: 12, color: C.muted }}>
@@ -221,7 +230,7 @@ export default function App() {
           </div>
           {isAuthenticated ? (
             <button
-              onClick={() => { if (window.confirm("Log out of EstatePro Manager?")) { apiLogout(); setIsAuthenticated(false); } }}
+              onClick={() => { if (window.confirm("Log out of Ivory Crown Homes?")) { apiLogout(); setIsAuthenticated(false); } }}
               style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.deep, color: C.muted, cursor: "pointer", fontSize: 12, fontFamily: "Georgia,serif", fontWeight: 600, letterSpacing: 0.3, transition: "background 0.15s, color 0.15s" }}
               onMouseEnter={(e) => { e.currentTarget.style.background = C.roseBg; e.currentTarget.style.color = C.rose; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = C.deep;   e.currentTarget.style.color = C.muted; }}
