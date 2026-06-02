@@ -262,7 +262,7 @@ export default function App() {
         <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className="header-date" style={{ textAlign: "right", fontSize: 12, color: C.muted }}>
             <div>{today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-            <div style={{ color: C.teal, marginTop: 2, fontWeight: 600 }}>{occupiedUnits.length}/{allUnits.length} Units Occupied</div>
+            <div className="header-occ" style={{ color: C.teal, marginTop: 2, fontWeight: 600 }}>{occupiedUnits.length}/{allUnits.length} Units Occupied</div>
           </div>
           <NotificationBell allUnits={allUnits} />
           {isAuthenticated ? (

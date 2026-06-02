@@ -53,14 +53,14 @@ export default function BlockCard({ block, requireAuth, onEndLease, onSaveTenant
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-          <Badge label={`${occ}/${total} Occupied`} color={accentColor} bg={accentBg} />
+          <span className="block-occ-badge"><Badge label={`${occ}/${total} Occupied`} color={accentColor} bg={accentBg} /></span>
           <span style={{ color: C.muted, fontSize: 18, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>⌄</span>
         </div>
       </div>
 
       {open && (
         <div style={{ borderTop: `1px solid ${C.borderLight}`, padding: "18px 22px", background: C.deep }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div className="block-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
             <SLabel>Rooms / Units in {block.name}</SLabel>
             <div style={{ display: "flex", gap: 8 }}>
               <Btn small onClick={() => requireAuth(() => setShowAddUnit(true))}>+ Add Room</Btn>
@@ -71,7 +71,7 @@ export default function BlockCard({ block, requireAuth, onEndLease, onSaveTenant
           {showAddUnit && (
             <div style={{ background: C.tealBg, border: `1px solid ${C.teal}44`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
               <SLabel color={C.teal}>New Room / Unit</SLabel>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <div className="add-unit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={lSt}>Name *</label>
                   <input style={iSt} placeholder={`e.g. Room ${block.name.replace(/\D/g, "")}E`} value={newU.name} onChange={(e) => setNewU((p) => ({ ...p, name: e.target.value }))} />

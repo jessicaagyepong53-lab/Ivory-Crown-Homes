@@ -12,38 +12,43 @@ body { margin: 0; }
 
 /* ── Mobile  (≤ 600px) ───────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  /* Header */
+  /* ── Header ── */
   .app-header {
-    padding: 12px 14px !important;
+    padding: 10px 12px !important;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
   }
-  .header-logo { width: 38px !important; height: 38px !important; border-radius: 10px !important; }
-  .header-title { font-size: 17px !important; }
-  .header-subtitle { display: none; }
-  .header-right { flex-direction: column; align-items: flex-end; gap: 8px !important; }
-  .header-date  { display: none; }
+  .header-logo { width: 36px !important; height: 36px !important; border-radius: 9px !important; }
+  .header-title { font-size: 15px !important; }
+  .header-subtitle { font-size: 9px !important; letter-spacing: 1.4px !important; margin-top: 1px !important; }
 
-  /* Nav */
-  .app-nav { padding: 0 6px !important; gap: 0 !important; }
-  .app-nav button { padding: 10px 10px !important; font-size: 11px !important; }
+  /* Show the date row but hide the long weekday string; keep "X/Y Units Occupied" */
+  .header-date { font-size: 11px !important; }
+  .header-date > div:first-child { display: none; }  /* hide "Monday 2 June 2026" */
+  .header-occ  { font-size: 11px !important; margin-top: 0 !important; }
 
-  /* Page content */
-  .app-content { padding: 14px 12px !important; }
+  .header-right { flex-direction: row !important; align-items: center !important; gap: 8px !important; flex-wrap: wrap; justify-content: flex-end; }
 
-  /* Stat grid — 2 cols on mobile */
+  /* ── Nav ── */
+  .app-nav { padding: 0 4px !important; gap: 0 !important; }
+  .app-nav button { padding: 9px 9px !important; font-size: 10.5px !important; }
+
+  /* ── Page content ── */
+  .app-content { padding: 12px 10px !important; }
+
+  /* ── Stat grid — 2 cols on mobile ── */
   .stat-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
+    gap: 9px !important;
   }
 
-  /* Cards */
-  .app-card { padding: 16px 12px !important; }
+  /* ── Cards ── */
+  .app-card { padding: 14px 10px !important; }
 
-  /* Tables → scrollable */
-  table { min-width: 520px; }
+  /* ── Tables → scrollable ── */
+  table { min-width: 480px; }
 
-  /* Page headers (title + button row) */
+  /* ── Page headers (title + button row) ── */
   .page-header {
     flex-direction: column !important;
     align-items: flex-start !important;
@@ -51,13 +56,31 @@ body { margin: 0; }
     margin-bottom: 12px !important;
   }
 
-  /* Block / revenue bar rows */
+  /* ── Block / revenue bar rows (Dashboard) ── */
   .rev-row { flex-wrap: wrap; gap: 6px !important; }
   .rev-row .rev-name { min-width: 100% !important; }
   .rev-row .rev-amt  { min-width: auto !important; }
 
-  /* Modals */
-  .modal-box { width: 96% !important; padding: 20px 16px !important; }
+  /* ── BlockCard: hide duplicate occ badge in header (info is in text) ── */
+  .block-occ-badge { display: none !important; }
+
+  /* ── BlockCard: Add Unit form — 1 col ── */
+  .add-unit-grid { grid-template-columns: 1fr !important; }
+
+  /* ── BlockCard: actions row (label + buttons) — wrap ── */
+  .block-actions { flex-direction: column !important; align-items: flex-start !important; }
+  .block-actions > div { flex-wrap: wrap !important; }
+
+  /* ── TenantRow: Renew / End Lease buttons — go below name ── */
+  .tenant-actions {
+    flex-direction: column !important;
+    gap: 5px !important;
+    align-items: flex-end !important;
+  }
+  .tenant-actions button { font-size: 11px !important; padding: 6px 10px !important; }
+
+  /* ── Modals ── */
+  .modal-box { width: 96% !important; padding: 18px 14px !important; }
 }
 
 /* ── Tablet  (601px – 900px) ─────────────────────────────────────────────── */
@@ -67,9 +90,11 @@ body { margin: 0; }
   .app-nav button { padding: 11px 12px !important; font-size: 12px !important; }
 
   /* Stat grid — 3 cols on tablet */
-  .stat-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
+  .stat-grid { grid-template-columns: repeat(3, 1fr) !important; }
 
   .header-date { font-size: 11px !important; }
+
+  /* BlockCard: Add Unit form — 2 cols on tablet */
+  .add-unit-grid { grid-template-columns: 1fr 1fr !important; }
 }
+

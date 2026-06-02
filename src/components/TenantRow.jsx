@@ -117,7 +117,7 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onSav
           </div>
 
           {isCurrent && (
-            <div style={{ display: "flex", gap: 7, flexShrink: 0 }}>
+            <div className="tenant-actions" style={{ display: "flex", gap: 7, flexShrink: 0 }}>
               {isExpired && (
                 <button
                   onClick={(e) => { e.stopPropagation(); requireAuth(() => setShowRenewModal(true)); }}
