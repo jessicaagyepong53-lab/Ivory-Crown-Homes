@@ -15,7 +15,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
   const [docViewer,   setDocViewer]   = useState(null); // { url, name, isImg }
   const [uploading,   setUploading]   = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [pdfLoading,  setPdfLoading]  = useState(false);
+
 
   async function readFiles(files) {
     setUploading(true);
@@ -122,49 +122,19 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                                /\.(docx?|xlsx?|csv)$/i.test(doc.name || "");
 
               function viewDoc() {
-                const run = async () => {
-                  if (!doc.did) return;
-                  const proxyUrl = `${API}/api/documents/${doc.did}/file`;
+                const run = () => {
+                  if (!doc.did || !doc.url) return;
+                  // doc.url is the public Cloudinary CDN URL — use it directly, no auth needed
                   if (isImg) {
-                    // Images: fetch as blob → show in modal
-                    try {
-                      setPdfLoading(true);
-                      const token = localStorage.getItem("token");
-                      const res = await fetch(proxyUrl, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      });
-                      if (!res.ok) throw new Error("Failed to load image");
-                      const blob = await res.blob();
-                      const blobUrl = URL.createObjectURL(blob);
-                      setDocViewer({ did: doc.did, url: blobUrl, name: doc.name, isImg: true });
-                    } catch {
-                      alert("Could not load image. Please try downloading it instead.");
-                    } finally {
-                      setPdfLoading(false);
-                    }
+                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: true });
                   } else if (isPdf) {
-                    // PDFs: fetch as blob → render in iframe modal (avoids popup blocker)
-                    try {
-                      setPdfLoading(true);
-                      const token = localStorage.getItem("token");
-                      const res = await fetch(proxyUrl, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      });
-                      if (!res.ok) throw new Error("Failed to load PDF");
-                      const blob = await res.blob();
-                      const blobUrl = URL.createObjectURL(blob);
-                      setDocViewer({ did: doc.did, url: blobUrl, name: doc.name, isImg: false, iframeUrl: blobUrl });
-                    } catch {
-                      alert("Could not open PDF. Please try downloading it instead.");
-                    } finally {
-                      setPdfLoading(false);
-                    }
+                    // Google PDF viewer renders Cloudinary-hosted PDFs reliably in an iframe
+                    const gdocUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`;
+                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: gdocUrl });
                   } else {
-                    // Office docs: use Google Viewer with Cloudinary URL
-                    const gdocUrl = doc.url
-                      ? `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`
-                      : proxyUrl;
-                    setDocViewer({ did: doc.did, url: proxyUrl, name: doc.name, isImg: false, iframeUrl: gdocUrl });
+                    // Office docs: same Google Viewer approach
+                    const gdocUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`;
+                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: gdocUrl });
                   }
                 };
                 if (requireAuth) requireAuth(run); else run();
@@ -210,7 +180,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                   </div>
                   <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                     {doc.did
-                      ? <button onClick={viewDoc} disabled={pdfLoading} style={{ background: C.skyBg, border: "none", color: C.sky, borderRadius: 6, padding: "4px 9px", cursor: pdfLoading ? "default" : "pointer", fontSize: 12, opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "⏳" : "👁 View"}</button>
+                      ? <button onClick={viewDoc} style={{ background: C.skyBg, border: "none", color: C.sky, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 12 }}>👁 View</button>
                       : <span style={{ fontSize: 11, color: C.rose, background: C.roseBg, border: `1px solid ${C.rose}44`, borderRadius: 6, padding: "4px 8px" }}>⚠ No file — delete & re-upload</span>
                     }
                     {doc.did && <button onClick={downloadDoc} style={{ background: C.sageBg, border: "none", color: C.sage, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontSize: 12 }}>⬇</button>}
