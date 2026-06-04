@@ -68,6 +68,11 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
   const collected = activeTenants.filter((t) => getDepPaid(t)).length;
   const pending   = activeTenants.filter((t) => !getDepPaid(t)).length;
 
+  // Past deposit totals
+  const pastDepCollected = pastDepRows.reduce((s, { tenant: t }) => s + (t.depositPaid ? Number(t.depositAmount) || 0 : 0), 0);
+  const pastDepPending   = pastDepRows.reduce((s, { tenant: t }) => s + (!t.depositPaid ? Number(t.depositAmount) || 0 : 0), 0);
+  const allTimeDepCollected = totalDepHeld + pastDepCollected;
+
   function startEdit(uid, currentAmt) {
     setEditing((p) => ({ ...p, [uid]: String(currentAmt) }));
   }
@@ -91,10 +96,13 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
       {/* Summary cards */}
       <div className="stat-grid" style={sGrid}>
         {[
-          { l: "Security Deposits Held",   v: fmt(totalDepHeld),  a: C.gold,  ab: C.goldBg  },
-          { l: "Rent Collected",  v: fmt(totalRentPaid), a: C.teal,  ab: C.tealBg  },
-          { l: "Security Deposits — Paid", v: collected,          a: C.sage,  ab: C.sageBg  },
-          { l: "Security Deposits — Due",  v: pending,            a: C.rose,  ab: C.roseBg  },
+          { l: "All-Time Deposits Collected", v: fmt(allTimeDepCollected), a: C.gold,     ab: C.goldBg     },
+          { l: "Active Deposits Held",        v: fmt(totalDepHeld),        a: C.lavender, ab: C.lavBg      },
+          { l: "Past Deposits Collected",     v: fmt(pastDepCollected),    a: C.sage,     ab: C.sageBg     },
+          { l: "Past Deposits Pending",       v: fmt(pastDepPending),      a: C.rose,     ab: C.roseBg     },
+          { l: "Rent Collected (Active)",     v: fmt(totalRentPaid),       a: C.teal,     ab: C.tealBg     },
+          { l: "Active Deps — Paid",          v: collected,                a: C.sage,     ab: C.sageBg     },
+          { l: "Active Deps — Due",           v: pending,                  a: C.rose,     ab: C.roseBg     },
         ].map((s) => (
           <div key={s.l} style={{ background: C.surface, border: `1px solid ${s.a}55`, borderRadius: 12, padding: "17px 21px", position: "relative", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
             <div style={{ position: "absolute", top: 0, left: 0, width: 4, height: "100%", background: s.a }} />
@@ -252,6 +260,21 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
                 );
               })}
             </tbody>
+            <tfoot>
+              {(() => {
+                const pastTotalRent = pastDepRows.reduce((s, { tenant }) => s + (Number(tenant.advanceAmount) || 0), 0);
+                const pastTotalDep  = pastDepRows.reduce((s, { tenant }) => s + (t => t.depositPaid ? Number(t.depositAmount) || 0 : 0)(tenant), 0);
+                return (
+                  <tr>
+                    <td colSpan={5} style={{ ...td, color: C.muted, fontStyle: "italic" }}>Totals (past tenants)</td>
+                    <td style={{ ...td, fontWeight: 700, color: C.teal }}>{fmt(pastTotalRent)}</td>
+                    <td style={{ ...td, fontWeight: 700, color: C.gold }}>{fmt(pastDepRows.reduce((s, { tenant }) => s + (Number(tenant.depositAmount) || 0), 0))}</td>
+                    <td style={td} />
+                    <td style={{ ...td, fontWeight: 700, color: C.text }}>{fmt(pastTotalRent + pastTotalDep)}</td>
+                  </tr>
+                );
+              })()}
+            </tfoot>
           </table>
           </div>
         </div>

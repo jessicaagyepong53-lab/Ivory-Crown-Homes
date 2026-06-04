@@ -228,26 +228,30 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onSav
 
                     {/* Rent & Financials card */}
                     {(t.monthlyRent > 0 || t.advanceMonths > 0 || t.balanceOwed > 0) && (() => {
-                      const rent    = Number(t.monthlyRent)   || 0;
-                      const adv     = Number(t.advanceMonths) || 0;
-                      const advAmt  = adv * rent;
-                      const secDep  = Number(t.depositAmount) || rent;
-                      const total   = advAmt + secDep;
-                      const balance = Number(t.balanceOwed)   || 0;
+                      const rent         = Number(t.monthlyRent)   || 0;
+                      const adv          = Number(t.advanceMonths) || 0;
+                      const advAmt       = adv * rent;
+                      const secDep       = Number(t.depositAmount) || rent;
+                      const total        = advAmt + secDep;
+                      const balance      = Number(t.balanceOwed)   || 0;
+                      const received     = total - balance;
+                      // Months actually paid = rent received ÷ monthly rent
+                      const rentReceived = t.depositPaid ? Math.max(0, received - secDep) : received;
+                      const monthsPaid   = rent > 0 ? Math.floor(rentReceived / rent) : 0;
                       return (
                         <div style={{ background: C.sageBg, border: `1px solid ${C.sage}33`, borderRadius: 8, padding: "9px 13px", marginBottom: 9 }}>
                           <div style={{ fontSize: 10, color: C.sage, letterSpacing: 1.1, textTransform: "uppercase", marginBottom: 6, fontWeight: 700 }}>Rent & Financials</div>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "5px 20px", fontSize: 13 }}>
                             <span style={{ color: C.muted }}>Monthly Rent</span>
                             <span style={{ fontWeight: 600, color: C.text, textAlign: "right" }}>GHS {rent.toLocaleString()}/mo</span>
-                            {adv > 0 && <><span style={{ color: C.muted }}>Advance Paid ({adv} month{adv !== 1 ? "s" : ""})</span><span style={{ fontWeight: 600, color: C.text, textAlign: "right" }}>GHS {advAmt.toLocaleString()}</span></>}
+                            {adv > 0 && <><span style={{ color: C.muted }}>Advance Paid ({monthsPaid} of {adv} month{adv !== 1 ? "s" : ""})</span><span style={{ fontWeight: 600, color: C.text, textAlign: "right" }}>GHS {rentReceived.toLocaleString()}</span></>}
                             {secDep > 0 && <><span style={{ color: C.muted }}>Security Deposit (1 month)</span><span style={{ fontWeight: 600, color: C.text, textAlign: "right" }}>{t.depositPaid ? "✓ " : "✗ "}GHS {secDep.toLocaleString()}</span></>}
                             {adv > 0 && <>
                               <span style={{ color: C.teal, fontWeight: 700, borderTop: `1px solid ${C.teal}33`, paddingTop: 5 }}>Total Expected</span>
                               <span style={{ color: C.teal, fontWeight: 700, textAlign: "right", borderTop: `1px solid ${C.teal}33`, paddingTop: 5 }}>GHS {total.toLocaleString()}</span>
                             </>}
                             {balance > 0 && <><span style={{ color: C.rose, fontWeight: 700 }}>Balance Owed</span><span style={{ color: C.rose, fontWeight: 700, textAlign: "right" }}>GHS {balance.toLocaleString()}</span></>}
-                            {balance > 0 && <><span style={{ color: C.sage, fontWeight: 700 }}>Amount Received</span><span style={{ color: C.sage, fontWeight: 700, textAlign: "right" }}>GHS {(total - balance).toLocaleString()}</span></>}
+                            {balance > 0 && <><span style={{ color: C.sage, fontWeight: 700 }}>Amount Received</span><span style={{ color: C.sage, fontWeight: 700, textAlign: "right" }}>GHS {received.toLocaleString()}</span></>}
                             {t.lastPaymentDate && <><span style={{ color: C.muted }}>Last Payment</span><span style={{ color: C.sage, textAlign: "right" }}>GHS {(Number(t.lastPaymentAmount)||0).toLocaleString()} — {t.lastPaymentDate}</span></>}
                           </div>
                         </div>

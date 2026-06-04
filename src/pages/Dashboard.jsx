@@ -54,7 +54,9 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
   function onBlockChange(bid) { setFilterBlock(bid); setFilterUnit(""); }
 
   const scopeTotals = scopeUnits.reduce((acc, u) => {
-    const { rentPaid, depPaid, maintCost } = calcUnit(u, maint);
+    const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
+    const rentPaid  = u.tenants.reduce((s, t) => s + (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0), 0);
+    const depPaid   = u.tenants.reduce((s, t) => s + (t.depositPaid ? (t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent) : 0), 0);
     return { rentPaid: acc.rentPaid + rentPaid, depPaid: acc.depPaid + depPaid, maintCost: acc.maintCost + maintCost };
   }, { rentPaid: 0, depPaid: 0, maintCost: 0 });
 
@@ -144,23 +146,47 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
             </thead>
             <tbody>
               {scopeUnits.length === 0 && (
-                <tr><td colSpan={7} style={{ ...td, textAlign: "center", color: C.muted, padding: 28 }}>No units match the selected filter.</td></tr>
+                <tr><td colSpan={8} style={{ ...td, textAlign: "center", color: C.muted, padding: 28 }}>No units match the selected filter.</td></tr>
               )}
-              {scopeUnits.map((u) => {
-                const { a, rentPaid, depPaid, maintCost } = calcUnit(u, maint);
-                const balance = a ? Number(a.balanceOwed) || 0 : 0;
-                return (
+              {scopeUnits.flatMap((u) => {
+                const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
+                if (u.tenants.length === 0) return [(
                   <tr key={u.uid}>
                     <td style={td}><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
-                    <td style={td}>{a ? a.name : <span style={{ color: C.faint, fontStyle: "italic" }}>Vacant</span>}</td>
+                    <td style={td}><span style={{ color: C.faint, fontStyle: "italic" }}>Vacant</span></td>
                     <td style={td}>{fmt(u.monthlyRent)}</td>
-                    <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{fmt(rentPaid)}</td>
-                    <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
-                    <td style={{ ...td, fontWeight: 600 }}>{fmt(rentPaid + depPaid)}</td>
-                    <td style={{ ...td, color: balance > 0 ? C.rose : C.faint, fontWeight: balance > 0 ? 700 : 400 }}>{balance > 0 ? fmt(balance) : "—"}</td>
-                    <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{maintCost > 0 ? fmt(maintCost) : "—"}</td>
+                    <td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} />
                   </tr>
-                );
+                )];
+                return u.tenants.map((t, i) => {
+                  const isActive = t.leaseStatus === "active";
+                  const rentPaid = Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0;
+                  const depAmt   = t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent;
+                  const depPaid  = t.depositPaid ? depAmt : 0;
+                  const balance  = isActive ? (Number(t.balanceOwed) || 0) : 0;
+                  const sy = t.leaseStart ? new Date(t.leaseStart).getFullYear() : "";
+                  const ey = (t.leaseEnd || t.cancelDate) ? new Date(t.leaseEnd || t.cancelDate).getFullYear() : "";
+                  const period = sy && ey && sy !== ey ? `${sy}–${ey}` : `${sy}`;
+                  return (
+                    <tr key={t._id || i} style={{ opacity: isActive ? 1 : 0.75, background: isActive ? "transparent" : C.panel }}>
+                      <td style={td}>
+                        {i === 0
+                          ? <><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></>
+                          : <span style={{ color: C.faint, paddingLeft: 10 }}>↳ {u.name}</span>}
+                      </td>
+                      <td style={td}>
+                        <span style={{ color: isActive ? C.text : C.muted, fontWeight: isActive ? 600 : 400 }}>{t.name}</span>
+                        {!isActive && period && <span style={{ fontSize: 10, color: C.lavender, marginLeft: 6, background: C.lavBg, borderRadius: 4, padding: "1px 5px" }}>{period}</span>}
+                      </td>
+                      <td style={td}>{fmt(Number(t.monthlyRent) || u.monthlyRent)}</td>
+                      <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{rentPaid > 0 ? fmt(rentPaid) : <span style={{ color: C.faint }}>—</span>}</td>
+                      <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
+                      <td style={{ ...td, fontWeight: 600 }}>{fmt(rentPaid + depPaid)}</td>
+                      <td style={{ ...td, color: balance > 0 ? C.rose : C.faint, fontWeight: balance > 0 ? 700 : 400 }}>{balance > 0 ? fmt(balance) : "—"}</td>
+                      <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{i === 0 && maintCost > 0 ? fmt(maintCost) : "—"}</td>
+                    </tr>
+                  );
+                });
               })}
             </tbody>
             {scopeUnits.length > 1 && (

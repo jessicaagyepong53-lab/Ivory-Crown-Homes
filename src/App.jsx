@@ -88,15 +88,13 @@ export default function App() {
     if (!a || !a.depositPaid) return s;
     return s + (a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent);
   }, 0);
-  const totalRentPaid = occupiedUnits.reduce((s, u) => {
-    const a = u.tenants.find((t) => getLeaseStatus(t) === "active");
-    if (!a || !a.leaseStart) return s;
-    // Use stored advanceAmount if available, else calculate from months elapsed
-    if (Number(a.advanceAmount) > 0) return s + Number(a.advanceAmount);
-    const start = new Date(a.leaseStart);
-    const cap   = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
+  const totalRentPaid = allTenants.reduce((s, t) => {
+    if (Number(t.advanceAmount) > 0) return s + Number(t.advanceAmount);
+    if (!t.leaseStart) return s;
+    const start  = new Date(t.leaseStart);
+    const cap    = t.leaseEnd ? new Date(Math.min(new Date(t.leaseEnd), today)) : today;
     const months = Math.max(0, (cap.getFullYear() - start.getFullYear()) * 12 + (cap.getMonth() - start.getMonth()));
-    return s + months * u.monthlyRent;
+    return s + months * (Number(t.monthlyRent) || 0);
   }, 0);
 
   const filteredTenants = allTenants.filter((t) => {
