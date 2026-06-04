@@ -126,11 +126,13 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                   if (!doc.did) return;
                   if (isImg) {
                     setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: true });
+                  } else if (isOffice) {
+                    // Microsoft Office Online handles Word/Excel natively
+                    const msUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.url)}`;
+                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: msUrl });
                   } else {
-                    // Use Google Docs Viewer with the public Cloudinary URL — no proxy needed
-                    const gdocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`;
-                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false,
-                      iframeUrl: gdocsUrl });
+                    // PDFs: use direct Cloudinary URL — Chrome/Edge/Firefox render natively in iframe
+                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: doc.url });
                   }
                 };
                 if (requireAuth) requireAuth(run); else run();
