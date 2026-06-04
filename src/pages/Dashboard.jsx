@@ -169,7 +169,7 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                   const ey = (t.leaseEnd || t.cancelDate) ? new Date(t.leaseEnd || t.cancelDate).getFullYear() : "";
                   const period = sy && ey && sy !== ey ? `${sy}–${ey}` : `${sy}`;
                   return (
-                    <tr key={t._id || i} style={{ opacity: isActive ? 1 : 0.75, background: isActive ? "transparent" : C.panel }}>
+                    <tr key={t.tid || `${u.uid}-${i}`} style={{ opacity: isActive ? 1 : 0.75, background: isActive ? "transparent" : C.panel }}>
                       <td style={td}>
                         {i === 0
                           ? <><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></>
