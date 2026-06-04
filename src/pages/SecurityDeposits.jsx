@@ -23,7 +23,8 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
     const depAmt   = a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent;
     const cap      = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
     const months   = monthsElapsed(a.leaseStart, cap);
-    const rentPaid = months * u.monthlyRent;
+    // Use stored advanceAmount if available (actual payment), else fall back to months × rent
+    const rentPaid = Number(a.advanceAmount) > 0 ? Number(a.advanceAmount) : months * u.monthlyRent;
     const depPaid  = a.depositPaid ? depAmt : 0;
     const total    = rentPaid + depPaid;
     return { depAmt, months, rentPaid, depPaid, total };

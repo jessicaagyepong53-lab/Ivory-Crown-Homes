@@ -91,6 +91,8 @@ export default function App() {
   const totalRentPaid = occupiedUnits.reduce((s, u) => {
     const a = u.tenants.find((t) => getLeaseStatus(t) === "active");
     if (!a || !a.leaseStart) return s;
+    // Use stored advanceAmount if available, else calculate from months elapsed
+    if (Number(a.advanceAmount) > 0) return s + Number(a.advanceAmount);
     const start = new Date(a.leaseStart);
     const cap   = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
     const months = Math.max(0, (cap.getFullYear() - start.getFullYear()) * 12 + (cap.getMonth() - start.getMonth()));

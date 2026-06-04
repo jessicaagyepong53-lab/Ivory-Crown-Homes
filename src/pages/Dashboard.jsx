@@ -16,7 +16,10 @@ function monthsElapsed(start, end) {
 function calcUnit(u, maint) {
   const a        = u.tenants.find((t) => t.leaseStatus === "active");
   const months   = a ? monthsElapsed(a.leaseStart, a.leaseEnd) : 0;
-  const rentPaid = months * u.monthlyRent;
+  // Use stored advanceAmount if available (actual payment), else fall back to months × rent
+  const rentPaid = a
+    ? (Number(a.advanceAmount) > 0 ? Number(a.advanceAmount) : months * u.monthlyRent)
+    : 0;
   const depAmt   = a ? (a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent) : 0;
   const depPaid  = a?.depositPaid ? depAmt : 0;
   const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
