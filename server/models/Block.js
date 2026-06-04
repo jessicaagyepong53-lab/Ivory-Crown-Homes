@@ -8,10 +8,11 @@ const DocumentSchema = new Schema({
   size:             Number,
   category:         { type: String, default: 'Other' },
   note:             String,
-  leasePeriod:      String, // e.g. "2025–2026" — auto-set on upload
+  leasePeriod:      String,
   cloudinaryId:     String,
-  cloudinaryType:   String, // 'image' | 'raw' | 'video' — from result.resource_type
+  cloudinaryType:   String,
   url:              String,
+  fileId:           Schema.Types.ObjectId, // ref to DocFile — used for proxy serving
   uploadedAt:       { type: Date, default: Date.now },
 }, { _id: true });
 

@@ -124,20 +124,14 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
               function viewDoc() {
                 const run = () => {
                   if (!doc.did) return;
-                  if (isImg) {
-                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: true });
+                  const token = localStorage.getItem("estatepro_token") || "";
+                  const proxyUrl = `${API}/api/documents/${doc.did}/file?token=${encodeURIComponent(token)}`;
+                  if (isOffice) {
+                    const msUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(proxyUrl)}`;
+                    setDocViewer({ did: doc.did, name: doc.name, isImg: false, iframeUrl: msUrl, proxyUrl });
                   } else {
-                    // Proxy the file through our server (handles Cloudinary auth + signed URLs).
-                    // Pass JWT as query param since iframes can't send custom headers.
-                    const token = localStorage.getItem("estatepro_token") || "";
-                    const proxyUrl = `${API}/api/documents/${doc.did}/file?token=${encodeURIComponent(token)}`;
-                    if (isOffice) {
-                      // MS Office Online wraps our proxy URL
-                      const msUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(proxyUrl)}`;
-                      setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: msUrl });
-                    } else {
-                      setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: proxyUrl });
-                    }
+                    // PDFs and images both served directly from proxy URL
+                    setDocViewer({ did: doc.did, name: doc.name, isImg, proxyUrl, iframeUrl: proxyUrl });
                   }
                 };
                 if (requireAuth) requireAuth(run); else run();
@@ -232,7 +226,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
             {/* Content */}
             {docViewer.isImg ? (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "auto", padding: 16, background: "#111" }}>
-                <img src={docViewer.url} alt={docViewer.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 6 }} />
+                <img src={docViewer.proxyUrl} alt={docViewer.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 6 }} />
               </div>
             ) : (
               <iframe
