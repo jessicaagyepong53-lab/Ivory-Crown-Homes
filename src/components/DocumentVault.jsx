@@ -7,6 +7,18 @@ import { fileIcon } from "../utils/helpers";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+// Infer document category from filename keywords
+function guessCategoryFromName(name) {
+  const n = (name || "").toLowerCase();
+  if (/lease|tenancy|rental.?agreement|rent.?agreement/.test(n))   return "Lease Agreement";
+  if (/passport|national.?id|ghana.?card|id.?card|drivers?.?licen/.test(n)) return "ID / Passport";
+  if (/deposit|receipt|payment/.test(n))                           return "Deposit Receipt";
+  if (/income|payslip|salary|bank.?statement|employment/.test(n)) return "Proof of Income";
+  if (/reference|recommenda/.test(n))                              return "Reference Letter";
+  if (/letter|notice|correspondence|email|memo/.test(n))          return "Correspondence";
+  return null; // no guess — keep current selection
+}
+
 export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth }) {
   const ref = useRef();
   const [drag,        setDrag]        = useState(false);
@@ -23,7 +35,8 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
     try {
       for (const file of Array.from(files)) {
         if (file.size > 10 * 1024 * 1024) { alert(`${file.name} exceeds 10 MB`); continue; }
-        await onAdd(file, cat, note);
+        const effectiveCat = guessCategoryFromName(file.name) || cat;
+        await onAdd(file, effectiveCat, note);
       }
     } catch (err) {
       setUploadError(err.response?.data?.error || "Upload failed — please log in and try again.");
@@ -89,7 +102,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
       {/* Category & note */}
       <div className="doc-cat-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <div>
-          <label style={lSt}>Category for next upload</label>
+          <label style={lSt}>Category <span style={{ color: C.faint, fontWeight: 400 }}>(auto-detected from filename)</span></label>
           <select style={iSt} value={cat} onChange={(e) => setCat(e.target.value)}>
             {DOC_CATS.map((c) => <option key={c}>{c}</option>)}
           </select>
