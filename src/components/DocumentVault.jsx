@@ -125,14 +125,13 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                 const run = () => {
                   if (!doc.did) return;
                   if (isImg) {
-                    // Images: Cloudinary URL works fine for <img> tags
+                    // Images: show in an in-page modal
                     setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: true });
-                  } else if (isPdf) {
-                    // PDFs: backend proxy with Content-Disposition:inline — browser renders natively
-                    setDocViewer({ did: doc.did, name: doc.name, isImg: false, iframeUrl: `${API}/api/documents/${doc.did}/file` });
                   } else {
-                    // Office docs: Google Docs Viewer (needs a public URL — use Cloudinary directly)
-                    setDocViewer({ did: doc.did, name: doc.name, isImg: false, iframeUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true` });
+                    // PDFs and office docs: open in a new browser tab.
+                    // window.open is far more reliable than an iframe — the browser's
+                    // native PDF viewer handles it regardless of Content-Disposition.
+                    window.open(`${API}/api/documents/${doc.did}/file`, '_blank', 'noopener');
                   }
                 };
                 if (requireAuth) requireAuth(run); else run();
@@ -140,7 +139,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
 
               function downloadDoc() {
                 const run = () => {
-                  // Backend proxy with dl=1 forces Content-Disposition:attachment with correct filename
+                  // Same-origin proxy URL — 'download' attribute works, correct filename preserved
                   const a = document.createElement("a");
                   a.href = `${API}/api/documents/${doc.did}/file?dl=1`;
                   a.download = doc.name;

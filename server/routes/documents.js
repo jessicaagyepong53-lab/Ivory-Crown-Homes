@@ -96,12 +96,11 @@ router.delete('/documents/:did', verifyJWT, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/documents/:did/file        — redirect to Cloudinary with fl_inline (view)
-// GET /api/documents/:did/file?dl=1  — redirect to Cloudinary with fl_attachment (download)
+// GET /api/documents/:did/file        — serve file inline (view in new tab)
+// GET /api/documents/:did/file?dl=1  — serve file as download
 //
-// We inject a Cloudinary delivery flag directly into the stored URL and redirect the
-// browser there. This avoids any server-side fetch (and its 401/auth issues) while
-// letting Cloudinary CDN serve the file with the correct Content-Disposition.
+// Fetches the file from Cloudinary CDN (public URL, no auth needed) and streams
+// it back to the browser as same-origin — so Content-Disposition and filename work.
 router.get('/documents/:did/file', async (req, res, next) => {
   try {
     const block = await Block.findOne({
@@ -118,17 +117,19 @@ router.get('/documents/:did/file', async (req, res, next) => {
     }
     if (!doc?.url) return res.status(404).send('No file stored');
 
-    const isDownload = req.query.dl === '1';
+    const safeName = (doc.name || 'file').replace(/["\\]/g, '');
+    const disposition = req.query.dl === '1' ? 'attachment' : 'inline';
 
-    // Insert the delivery flag right after /upload/ in the Cloudinary URL.
-    // fl_inline  → Content-Disposition: inline  (browser renders PDF in iframe)
-    // fl_attachment → Content-Disposition: attachment (browser saves the file)
-    const flag = isDownload ? 'fl_attachment' : 'fl_inline';
-    const deliveryUrl = doc.url.includes('/upload/')
-      ? doc.url.replace('/upload/', `/upload/${flag}/`)
-      : doc.url;
+    // Cloudinary CDN URLs (res.cloudinary.com) are publicly accessible without auth.
+    // Only Cloudinary API calls (api.cloudinary.com) require API key/secret.
+    const upstream = await fetch(doc.url);
+    if (!upstream.ok) return res.status(502).send(`Upstream error ${upstream.status}`);
 
-    return res.redirect(302, deliveryUrl);
+    const buffer = await upstream.arrayBuffer();
+    res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${disposition}; filename="${safeName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(Buffer.from(buffer));
   } catch (err) { next(err); }
 });
 
