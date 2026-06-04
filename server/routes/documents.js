@@ -124,38 +124,26 @@ router.get('/documents/:did/file', async (req, res, next) => {
     }
     if (!doc?.url || !doc?.cloudinaryId) return res.status(404).send('No file stored');
 
-    // Extract format from the stored URL
-    const urlPath = new URL(doc.url).pathname;
-    const lastSeg = urlPath.split('/').pop();
-    const dotIdx  = lastSeg.lastIndexOf('.');
-    const format  = dotIdx > 0 ? lastSeg.slice(dotIdx + 1) : '';
+    // resource_type: stored on upload, or inferred from URL path segment
+    const resourceType = doc.cloudinaryType
+      || (doc.url.includes('/video/') ? 'video' : doc.url.includes('/raw/') ? 'raw' : 'image');
 
-    // Use stored resource_type first (saved on upload), then guess from URL, then try all
-    const storedType = doc.cloudinaryType;
-    const urlType    = doc.url.includes('/video/') ? 'video'
-                     : doc.url.includes('/raw/')   ? 'raw'
-                     : 'image';
-    const typesToTry = [...new Set([storedType, urlType, 'image', 'raw', 'video'].filter(Boolean))];
+    // cloudinary.url() with sign_url:true generates a signature-embedded CDN URL.
+    // This is the correct method for type=upload assets with access restrictions.
+    // private_download_url is for type=private — wrong endpoint, always 404 here.
+    const signedUrl = cloudinary.url(doc.cloudinaryId, {
+      secure: true,
+      sign_url: true,
+      type: 'upload',
+      resource_type: resourceType,
+    });
 
-    console.log(`[doc-proxy] id=${doc.cloudinaryId} format=${format} storedType=${storedType} urlType=${urlType}`);
-    console.log(`[doc-proxy] cloudName=${process.env.CLOUDINARY_CLOUD_NAME} apiKey=${process.env.CLOUDINARY_API_KEY ? 'SET' : 'MISSING'} apiSecret=${process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING'}`);
-
-    let upstream = null;
-    let lastError = '';
-    for (const rt of typesToTry) {
-      const signedUrl = cloudinary.utils.private_download_url(
-        doc.cloudinaryId, format, { resource_type: rt, attachment: false }
-      );
-      console.log(`[doc-proxy] trying resource_type=${rt} url=${signedUrl}`);
-      const r = await fetch(signedUrl);
-      if (r.ok) { upstream = r; console.log(`[doc-proxy] SUCCESS resource_type=${rt}`); break; }
-      const body = await r.text().catch(() => '');
-      lastError = `${rt}:${r.status}:${body.slice(0, 100)}`;
-      console.warn(`[doc-proxy] failed resource_type=${rt} status=${r.status} body=${body.slice(0, 200)}`);
-    }
-
-    if (!upstream) {
-      return res.status(502).send(`Could not retrieve file. Errors: ${lastError}`);
+    console.log(`[doc-proxy] fetching resource_type=${resourceType} signed=${signedUrl}`);
+    const upstream = await fetch(signedUrl);
+    if (!upstream.ok) {
+      const body = await upstream.text().catch(() => '');
+      console.error(`[doc-proxy] failed status=${upstream.status} body=${body.slice(0, 300)}`);
+      return res.status(502).send(`Could not retrieve file (${upstream.status}): ${body.slice(0, 200)}`);
     }
 
     const dl = req.query.dl === '1';
