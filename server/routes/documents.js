@@ -97,9 +97,8 @@ router.delete('/documents/:did', verifyJWT, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/documents/:did/file — sign a Cloudinary URL server-side and stream
-// the file back to the client. Accepts JWT via Authorization header OR ?token=
-// query param (needed for iframe src which can't send custom headers).
+// GET /api/documents/:did/file — proxy file from Cloudinary using a signed URL.
+// Accepts JWT via Authorization header OR ?token= query param (needed for iframes).
 router.get('/documents/:did/file', async (req, res, next) => {
   try {
     // Verify JWT — accept from header or query param (for iframe)
@@ -124,27 +123,33 @@ router.get('/documents/:did/file', async (req, res, next) => {
     }
     if (!doc?.url || !doc?.cloudinaryId) return res.status(404).send('No file stored');
 
-    // Detect resource_type and format from the stored URL/id
+    // Detect resource_type from stored URL
     const resourceType = doc.url.includes('/video/') ? 'video'
                        : doc.url.includes('/image/') ? 'image'
                        : 'raw';
 
-    // Extract format from cloudinaryId (e.g. "estatepro/abc.pdf" → "pdf")
-    const idParts = doc.cloudinaryId.split('.');
-    const format = idParts.length > 1 ? idParts[idParts.length - 1] : '';
+    // Extract format from the stored URL (reliable — the URL always has the extension)
+    const urlPath = new URL(doc.url).pathname;
+    const lastSegment = urlPath.split('/').pop();
+    const dotIdx = lastSegment.lastIndexOf('.');
+    const format = dotIdx > 0 ? lastSegment.slice(dotIdx + 1) : '';
 
-    // private_download_url produces an API-signed URL that bypasses ALL Cloudinary
-    // access restrictions — the signature proves we are the account owner.
-    const signedUrl = cloudinary.utils.private_download_url(
-      doc.cloudinaryId,
-      format,
-      { resource_type: resourceType, expires_at: Math.floor(Date.now() / 1000) + 300 }
-    );
+    // Generate a signed CDN URL — the embedded signature proves account ownership
+    // and bypasses strict transformation restrictions.
+    const signedUrl = cloudinary.url(doc.cloudinaryId, {
+      secure: true,
+      sign_url: true,
+      type: 'upload',
+      resource_type: resourceType,
+      ...(format ? { format } : {}),
+    });
 
     const upstream = await fetch(signedUrl);
     if (!upstream.ok) {
-      console.error('Cloudinary fetch failed:', upstream.status, signedUrl);
-      return res.status(502).send('Could not retrieve file from storage');
+      const body = await upstream.text().catch(() => '');
+      console.error(`Cloudinary fetch failed [${upstream.status}]: ${body.slice(0, 200)}`);
+      console.error('Signed URL was:', signedUrl);
+      return res.status(502).send(`Could not retrieve file from storage (${upstream.status})`);
     }
 
     const dl = req.query.dl === '1';
@@ -153,7 +158,10 @@ router.get('/documents/:did/file', async (req, res, next) => {
     res.setHeader('Content-Disposition', `${dl ? 'attachment' : 'inline'}; filename="${safeName}"`);
     res.setHeader('Cache-Control', 'private, max-age=120');
 
-    Readable.fromWeb(upstream.body).pipe(res);
+    // Buffer the response to avoid Readable.fromWeb compatibility issues
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    res.setHeader('Content-Length', buf.length);
+    res.end(buf);
   } catch (err) { next(err); }
 });
 
