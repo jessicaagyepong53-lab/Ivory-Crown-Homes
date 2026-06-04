@@ -122,11 +122,30 @@ router.get('/documents/:did/file', async (req, res, next) => {
         if (d) { doc = d; break outer; }
       }
     }
-    if (!doc?.url) return res.status(404).send('No file stored');
+    if (!doc?.url || !doc?.cloudinaryId) return res.status(404).send('No file stored');
 
-    // Fetch file server-side (Node.js bypasses browser CORS/embedding restrictions)
-    const upstream = await fetch(doc.url);
-    if (!upstream.ok) return res.status(502).send('Could not retrieve file from storage');
+    // Detect resource_type and format from the stored URL/id
+    const resourceType = doc.url.includes('/video/') ? 'video'
+                       : doc.url.includes('/image/') ? 'image'
+                       : 'raw';
+
+    // Extract format from cloudinaryId (e.g. "estatepro/abc.pdf" → "pdf")
+    const idParts = doc.cloudinaryId.split('.');
+    const format = idParts.length > 1 ? idParts[idParts.length - 1] : '';
+
+    // private_download_url produces an API-signed URL that bypasses ALL Cloudinary
+    // access restrictions — the signature proves we are the account owner.
+    const signedUrl = cloudinary.utils.private_download_url(
+      doc.cloudinaryId,
+      format,
+      { resource_type: resourceType, expires_at: Math.floor(Date.now() / 1000) + 300 }
+    );
+
+    const upstream = await fetch(signedUrl);
+    if (!upstream.ok) {
+      console.error('Cloudinary fetch failed:', upstream.status, signedUrl);
+      return res.status(502).send('Could not retrieve file from storage');
+    }
 
     const dl = req.query.dl === '1';
     const safeName = encodeURIComponent(doc.name || 'file');
