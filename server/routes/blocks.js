@@ -213,19 +213,26 @@ router.post('/tenants/:tid/renew', verifyJWT, async (req, res, next) => {
       tenant = unit.tenants.id(req.params.tid);
       if (tenant) break;
     }
-    // Archive the full current lease period into history
+    // Archive the full current lease period into history (including documents)
     if (!tenant.leaseHistory) tenant.leaseHistory = [];
     tenant.leaseHistory.push({
-      leaseStart:    tenant.leaseStart,
-      leaseEnd:      tenant.leaseEnd,
-      depositPaid:   tenant.depositPaid,
-      depositAmount: tenant.depositAmount,
-      monthlyRent:   tenant.monthlyRent,
-      advanceMonths: tenant.advanceMonths,
-      advanceAmount: tenant.advanceAmount,
-      balanceOwed:   tenant.balanceOwed || 0,
-      renewedAt:     new Date().toISOString().slice(0, 10),
+      leaseStart:         tenant.leaseStart,
+      leaseEnd:           tenant.leaseEnd,
+      depositPaid:        tenant.depositPaid,
+      depositAmount:      tenant.depositAmount,
+      monthlyRent:        tenant.monthlyRent,
+      advanceMonths:      tenant.advanceMonths,
+      advanceAmount:      tenant.advanceAmount,
+      balanceOwed:        tenant.balanceOwed || 0,
+      lastPaymentAmount:  tenant.lastPaymentAmount || 0,
+      lastPaymentDate:    tenant.lastPaymentDate || null,
+      renewedAt:          new Date().toISOString().slice(0, 10),
+      documents:          tenant.documents ? tenant.documents.toObject() : [],
     });
+    // Clear documents for the new lease period
+    tenant.documents         = [];
+    tenant.lastPaymentAmount = 0;
+    tenant.lastPaymentDate   = null;
     // Apply the new lease period — reset financials for new term
     tenant.leaseStart     = req.body.leaseStart;
     tenant.leaseEnd       = req.body.leaseEnd       || null;

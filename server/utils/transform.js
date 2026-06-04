@@ -13,6 +13,10 @@ function txTenant(t) {
     tid: _id.toString(),
     ...rest,
     documents: (rest.documents || []).map(txDoc),
+    leaseHistory: (rest.leaseHistory || []).map((h) => ({
+      ...h,
+      documents: (h.documents || []).map(txDoc),
+    })),
   };
 }
 

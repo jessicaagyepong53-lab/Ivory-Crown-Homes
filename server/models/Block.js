@@ -28,6 +28,7 @@ const LeaseHistorySchema = new Schema({
   lastPaymentAmount:    { type: Number, default: 0 },
   lastPaymentDate:      String,
   renewedAt:            String,
+  documents:            [DocumentSchema],
 }, { _id: false });
 
 const TenantSchema = new Schema({

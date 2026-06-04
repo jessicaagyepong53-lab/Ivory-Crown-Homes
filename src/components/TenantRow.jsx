@@ -282,6 +282,8 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onSav
                           const advAmt = Number(h.advanceAmount) || adv * rent;
                           const dep    = Number(h.depositAmount) || 0;
                           const bal    = Number(h.balanceOwed)   || 0;
+                          const lpmAmt = Number(h.lastPaymentAmount) || 0;
+                          const histDocs = h.documents || [];
                           return (
                             <div key={i} style={{ background: C.lavBg, border: `1px solid ${C.lavender}22`, borderRadius: 7, padding: "10px 12px", marginBottom: 6, fontSize: 12 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
@@ -295,7 +297,36 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onSav
                                 {advAmt > 0 && <span>Advance Paid: <b style={{ color: C.text }}>GHS {advAmt.toLocaleString()}</b></span>}
                                 {dep > 0   && <span>Deposit: <b style={{ color: C.text }}>{h.depositPaid ? "✓ " : "✗ "}GHS {dep.toLocaleString()}</b></span>}
                                 {bal > 0   && <span>Balance Owed: <b style={{ color: C.rose }}>GHS {bal.toLocaleString()}</b></span>}
+                                {lpmAmt > 0 && h.lastPaymentDate && <span>Last Payment: <b style={{ color: C.sage }}>GHS {lpmAmt.toLocaleString()} on {h.lastPaymentDate}</b></span>}
                               </div>
+                              {histDocs.length > 0 && (
+                                <div style={{ marginTop: 8, borderTop: `1px solid ${C.lavender}22`, paddingTop: 7 }}>
+                                  <div style={{ fontSize: 10, color: C.teal, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5, fontWeight: 600 }}>📁 Documents ({histDocs.length})</div>
+                                  {histDocs.map((doc) => (
+                                    <div key={doc.did} style={{ display: "flex", alignItems: "center", gap: 8, background: C.panel, border: `1px solid ${C.borderLight}`, borderRadius: 6, padding: "6px 10px", marginBottom: 4 }}>
+                                      <span style={{ fontSize: 13, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: C.text }}>{doc.name}</span>
+                                      {doc.category && <span style={{ fontSize: 10, color: C.muted }}>{doc.category}</span>}
+                                      {doc.did && (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              const token = localStorage.getItem("estatepro_token") || "";
+                                              const base  = (import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "");
+                                              window.open(`${base}/api/documents/${doc.did}/file?token=${encodeURIComponent(token)}`, "_blank");
+                                            }}
+                                            style={{ padding: "3px 8px", border: `1px solid ${C.teal}`, background: C.tealBg, color: C.teal, borderRadius: 5, fontSize: 11, cursor: "pointer", fontFamily: "Georgia,serif", whiteSpace: "nowrap" }}
+                                          >View</button>
+                                          <a
+                                            href={`${(import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "")}/api/documents/${doc.did}/file?dl=1&token=${encodeURIComponent(localStorage.getItem("estatepro_token") || "")}`}
+                                            download={doc.name}
+                                            style={{ padding: "3px 8px", border: `1px solid ${C.border}`, background: C.deep, color: C.muted, borderRadius: 5, fontSize: 11, textDecoration: "none", fontFamily: "Georgia,serif", whiteSpace: "nowrap" }}
+                                          >↓</a>
+                                        </>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
