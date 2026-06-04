@@ -112,12 +112,23 @@ router.get('/documents/:did/file', async (req, res, next) => {
         if (d) { doc = d; break outer; }
       }
     }
-    if (!doc?.url) return res.status(404).send('No file stored');
+    if (!doc?.url && !doc?.cloudinaryId) return res.status(404).send('No file stored');
 
     const safeName = (doc.name || 'file').replace(/["\\]/g, '');
     const disposition = req.query.dl === '1' ? 'attachment' : 'inline';
 
-    const upstream = await fetch(doc.url);
+    // Derive resource_type from stored mimeType so the signed URL is correct
+    const resourceType = doc.mimeType?.startsWith('image/') ? 'image'
+                       : doc.mimeType?.startsWith('video/') ? 'video'
+                       : 'raw';
+
+    // Generate a signed Cloudinary URL via the SDK (works even when the account
+    // enforces signed delivery — avoids 401 when fetching the raw stored URL)
+    const fetchUrl = doc.cloudinaryId
+      ? cloudinary.url(doc.cloudinaryId, { secure: true, resource_type: resourceType, type: 'upload', sign_url: true })
+      : doc.url;
+
+    const upstream = await fetch(fetchUrl);
     if (!upstream.ok) return res.status(502).send(`Storage error ${upstream.status}`);
     const buffer = await upstream.arrayBuffer();
     res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
