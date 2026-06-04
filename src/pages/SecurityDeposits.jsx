@@ -39,17 +39,24 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
     onSaveTenant(u.uid, { ...t, depositPaid: next });
   }
 
-  // Per-row calculations — cap at leaseEnd so rent paid never exceeds the lease term
+  // Per-row calculations
   function rowCalc(u, a) {
     const depAmt   = a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent;
     const paid     = getDepPaid(a);
-    const cap      = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
-    const months   = monthsElapsed(a.leaseStart, cap);
-    // Use stored advanceAmount if available (actual payment), else fall back to months × rent
-    const rentPaid = Number(a.advanceAmount) > 0 ? Number(a.advanceAmount) : months * u.monthlyRent;
+    const rent     = Number(a.monthlyRent) || u.monthlyRent || 0;
+    // Use stored advanceAmount if available (actual payment), else fall back to calendar months × rent
+    const rentPaid = Number(a.advanceAmount) > 0
+      ? Number(a.advanceAmount)
+      : monthsElapsed(a.leaseStart, a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today) * rent;
     const depPaid  = paid ? depAmt : 0;
     const total    = rentPaid + depPaid;
-    return { depAmt, months, rentPaid, depPaid, total, paid };
+    // Months actually paid based on advance received (excludes deposit)
+    const balance      = Number(a.balanceOwed) || 0;
+    const totalExpected = rentPaid + depAmt;
+    const received      = totalExpected - balance;
+    const rentReceived  = paid ? Math.max(0, received - depAmt) : received;
+    const monthsPaid    = rent > 0 ? Math.floor(rentReceived / rent) : 0;
+    return { depAmt, monthsPaid, rentPaid, depPaid, total, paid };
   }
 
   const totalDepHeld = activeRows.reduce((s, u) => {
@@ -127,7 +134,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
           <tbody>
             {activeRows.map((u) => {
               const a = u.tenants.find((t) => t.leaseStatus === "active");
-              const { depAmt, months, rentPaid, depPaid, total, paid } = rowCalc(u, a);
+              const { depAmt, monthsPaid, rentPaid, depPaid, total, paid } = rowCalc(u, a);
               const isEditing = u.uid in editing;
 
               return (
@@ -136,7 +143,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
                   <td style={td}><b>{u.name}</b></td>
                   <td style={td}>{a.name}</td>
                   <td style={td}>{fmt(u.monthlyRent)}</td>
-                  <td style={{ ...td, textAlign: "center" }}>{months} mo</td>
+                  <td style={{ ...td, textAlign: "center" }}>{monthsPaid} mo</td>
                   <td style={td}><span style={{ color: C.teal, fontWeight: 600 }}>{fmt(rentPaid)}</span></td>
 
                   {/* Editable deposit amount */}
