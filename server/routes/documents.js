@@ -1,7 +1,6 @@
 import express from 'express';
 import multer from 'multer';
 import mongoose from 'mongoose';
-import https from 'https';
 import { Readable } from 'stream';
 import Block from '../models/Block.js';
 import { txBlock, txDoc } from '../utils/transform.js';
@@ -97,11 +96,14 @@ router.delete('/documents/:did', verifyJWT, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/documents/:did/file        — serve file inline (view in new tab)
-// GET /api/documents/:did/file?dl=1  — serve file as download
+// GET /api/documents/:did/file        — open file inline (view in new tab)
+// GET /api/documents/:did/file?dl=1  — download file
 //
-// Uses Node's built-in https.get to stream from Cloudinary CDN and re-serve
-// with correct Content-Disposition header (same-origin, so browser handles it).
+// Generates a signed Cloudinary CDN URL locally (no network call — just HMAC
+// using the API secret) then redirects the browser to it. The signed URL is
+// accepted by Cloudinary regardless of account security settings.
+// fl_inline  → Content-Disposition: inline  → browser renders PDF natively
+// fl_attachment → Content-Disposition: attachment → browser downloads with correct filename
 router.get('/documents/:did/file', async (req, res, next) => {
   try {
     const block = await Block.findOne({
@@ -118,22 +120,32 @@ router.get('/documents/:did/file', async (req, res, next) => {
     }
     if (!doc?.url) return res.status(404).send('No file stored');
 
-    const safeName = (doc.name || 'file').replace(/["\\]/g, '');
-    const disposition = req.query.dl === '1' ? 'attachment' : 'inline';
+    const isDownload = req.query.dl === '1';
 
-    // Stream directly from Cloudinary CDN to the client.
-    // CDN URLs (res.cloudinary.com) are public — no API auth needed.
-    https.get(doc.url, (cloudRes) => {
-      if (cloudRes.statusCode >= 400) {
-        res.status(502).send(`Upstream error: ${cloudRes.statusCode}`);
-        cloudRes.resume(); // drain so socket closes
-        return;
-      }
-      res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `${disposition}; filename="${safeName}"`);
-      res.setHeader('Cache-Control', 'private, max-age=300');
-      cloudRes.pipe(res);
-    }).on('error', next);
+    // Detect resource_type from the stored URL path, e.g. /raw/upload/ or /image/upload/
+    const resTypeMatch = doc.url.match(/\/(image|video|raw)\/upload\//);
+    const resourceType = resTypeMatch?.[1] ?? 'raw';
+
+    // Sanitise filename for the Cloudinary flag value (no spaces/quotes)
+    const safeName = (doc.name || 'file').replace(/[^\w.\-]/g, '_');
+    const flag = isDownload ? `attachment:${safeName}` : 'inline';
+
+    if (doc.cloudinaryId) {
+      // cloudinary.url() is a pure local computation — it signs the URL using
+      // the API secret without any network call. Safe, fast, always works.
+      const signedUrl = cloudinary.url(doc.cloudinaryId, {
+        secure: true,
+        resource_type: resourceType,
+        type: 'upload',
+        sign_url: true,
+        transformation: [{ flags: flag }],
+      });
+      return res.redirect(302, signedUrl);
+    }
+
+    // Fallback: docs uploaded before cloudinaryId was saved — redirect to raw URL.
+    // These are publicly accessible (image-type resources, which have no auth requirement).
+    return res.redirect(302, doc.url);
   } catch (err) { next(err); }
 });
 
