@@ -15,19 +15,41 @@ function monthsElapsed(start, end) {
 export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenants, onSaveTenant }) {
   // uid → draft deposit amount string while editing
   const [editing, setEditing] = useState({});
+  // tid → optimistic boolean override for depositPaid (cleared when parent state syncs)
+  const [localStatus, setLocalStatus] = useState({});
 
   const activeRows = allUnits.filter((u) => u.tenants.some((t) => t.leaseStatus === "active"));
+
+  // Past tenant rows: ended/cancelled tenants who had a deposit recorded
+  const pastDepRows = allUnits.flatMap((u) =>
+    u.tenants
+      .filter((t) => t.leaseStatus !== "active" && (Number(t.depositAmount) > 0 || t.depositPaid))
+      .map((t) => ({ unit: u, tenant: t }))
+  );
+
+  // Get depositPaid with optimistic local override
+  function getDepPaid(t) {
+    return t.tid in localStatus ? localStatus[t.tid] : t.depositPaid;
+  }
+
+  // Toggle with optimistic update
+  function toggleDeposit(u, t) {
+    const next = !getDepPaid(t);
+    setLocalStatus((p) => ({ ...p, [t.tid]: next }));
+    onSaveTenant(u.uid, { ...t, depositPaid: next });
+  }
 
   // Per-row calculations — cap at leaseEnd so rent paid never exceeds the lease term
   function rowCalc(u, a) {
     const depAmt   = a.depositAmount != null ? Number(a.depositAmount) : u.monthlyRent;
+    const paid     = getDepPaid(a);
     const cap      = a.leaseEnd ? new Date(Math.min(new Date(a.leaseEnd), today)) : today;
     const months   = monthsElapsed(a.leaseStart, cap);
     // Use stored advanceAmount if available (actual payment), else fall back to months × rent
     const rentPaid = Number(a.advanceAmount) > 0 ? Number(a.advanceAmount) : months * u.monthlyRent;
-    const depPaid  = a.depositPaid ? depAmt : 0;
+    const depPaid  = paid ? depAmt : 0;
     const total    = rentPaid + depPaid;
-    return { depAmt, months, rentPaid, depPaid, total };
+    return { depAmt, months, rentPaid, depPaid, total, paid };
   }
 
   const totalDepHeld = activeRows.reduce((s, u) => {
@@ -42,8 +64,9 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
     return s + rentPaid;
   }, 0);
 
-  const collected = activeTenants.filter((t) => t.depositPaid).length;
-  const pending   = activeTenants.filter((t) => !t.depositPaid).length;
+  // Collected/pending counts using optimistic local status
+  const collected = activeTenants.filter((t) => getDepPaid(t)).length;
+  const pending   = activeTenants.filter((t) => !getDepPaid(t)).length;
 
   function startEdit(uid, currentAmt) {
     setEditing((p) => ({ ...p, [uid]: String(currentAmt) }));
@@ -96,7 +119,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
           <tbody>
             {activeRows.map((u) => {
               const a = u.tenants.find((t) => t.leaseStatus === "active");
-              const { depAmt, months, rentPaid, depPaid, total } = rowCalc(u, a);
+              const { depAmt, months, rentPaid, depPaid, total, paid } = rowCalc(u, a);
               const isEditing = u.uid in editing;
 
               return (
@@ -136,9 +159,9 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
 
                   <td style={td}>
                     <Badge
-                      label={a.depositPaid ? "Collected" : "Pending"}
-                      color={a.depositPaid ? C.sage : C.rose}
-                      bg={a.depositPaid ? C.sageBg : C.roseBg}
+                      label={paid ? "Collected" : "Pending"}
+                      color={paid ? C.sage : C.rose}
+                      bg={paid ? C.sageBg : C.roseBg}
                     />
                   </td>
 
@@ -146,16 +169,16 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
                   <td style={td}>
                     <b style={{ color: C.text }}>{fmt(total)}</b>
                     <div style={{ fontSize: 10, color: C.faint, marginTop: 2 }}>
-                      rent {fmt(rentPaid)}{a.depositPaid ? ` + dep ${fmt(depPaid)}` : ""}
+                      rent {fmt(rentPaid)}{paid ? ` + dep ${fmt(depPaid)}` : ""}
                     </div>
                   </td>
 
                   <td style={td}>
                     <button
-                      onClick={() => onSaveTenant(u.uid, { ...a, depositPaid: !a.depositPaid })}
+                      onClick={() => toggleDeposit(u, a)}
                       style={{ background: C.panel, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "Georgia,serif", whiteSpace: "nowrap" }}
                     >
-                      {a.depositPaid ? "Mark Pending" : "Mark Collected"}
+                      {paid ? "Mark Pending" : "Mark Collected"}
                     </button>
                   </td>
                 </tr>
@@ -175,6 +198,64 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
         </table>
         </div>
       </div>
+
+      {/* Past Tenant Deposits */}
+      {pastDepRows.length > 0 && (
+        <div style={{ ...card, marginTop: 18 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.muted, marginBottom: 12 }}>Past Tenant Deposits</div>
+          <div className="tbl-wrap">
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Block", "Unit", "Tenant", "Lease Period", "Monthly Rent", "Advance Paid", "Deposit Amount", "Dep. Status", "Total Collected"].map((h) => (
+                  <th key={h} style={th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pastDepRows.map(({ unit: u, tenant: t }) => {
+                const depAmt  = Number(t.depositAmount) || 0;
+                const rent    = Number(t.advanceAmount)  || 0;
+                const depPaid = t.depositPaid ? depAmt : 0;
+                const total   = rent + depPaid;
+                const sy = t.leaseStart ? new Date(t.leaseStart).getFullYear() : "";
+                const ey = (t.leaseEnd || t.cancelDate) ? new Date(t.leaseEnd || t.cancelDate).getFullYear() : "";
+                const period = sy && ey && sy !== ey ? `${sy}–${ey}` : `${sy}`;
+                return (
+                  <tr key={t.tid} style={{ opacity: 0.85 }}>
+                    <td style={td}>{u.blockName}</td>
+                    <td style={td}><b>{u.name}</b></td>
+                    <td style={td}>
+                      {t.name}
+                      <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>
+                        {t.leaseStatus === "cancelled" ? "Cancelled" : "Ended"}
+                      </div>
+                    </td>
+                    <td style={{ ...td, color: C.lavender, fontWeight: 600 }}>{period}</td>
+                    <td style={td}>{fmt(t.monthlyRent || 0)}</td>
+                    <td style={td}><span style={{ color: C.teal, fontWeight: 600 }}>{fmt(rent)}</span></td>
+                    <td style={{ ...td, color: C.gold, fontWeight: 700 }}>{fmt(depAmt)}</td>
+                    <td style={td}>
+                      <Badge
+                        label={t.depositPaid ? "Collected" : "Pending"}
+                        color={t.depositPaid ? C.sage : C.rose}
+                        bg={t.depositPaid ? C.sageBg : C.roseBg}
+                      />
+                    </td>
+                    <td style={td}>
+                      <b style={{ color: C.text }}>{fmt(total)}</b>
+                      <div style={{ fontSize: 10, color: C.faint, marginTop: 2 }}>
+                        rent {fmt(rent)}{t.depositPaid ? ` + dep ${fmt(depPaid)}` : ""}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      )}
     </>
   );
 }
