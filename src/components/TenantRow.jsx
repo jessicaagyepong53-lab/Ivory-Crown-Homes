@@ -67,8 +67,13 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onSav
     setLocalDocs((prev) => [...prev, newDoc]);
   }
   async function delDoc(did) {
-    await deleteDocument(did);
-    setLocalDocs((prev) => prev.filter((d) => d.did !== did));
+    try {
+      await deleteDocument(did);
+      setLocalDocs((prev) => prev.filter((d) => d.did !== did));
+    } catch (e) {
+      alert('Delete failed — the server may still be starting up. Please wait a moment and try again.');
+      console.error('delDoc error:', e);
+    }
   }
 
   function TabBtn({ id, label, count }) {

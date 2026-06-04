@@ -125,12 +125,13 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                 const run = () => {
                   if (!doc.did) return;
                   const token = localStorage.getItem("estatepro_token") || "";
-                  const proxyUrl = `${API}/api/documents/${doc.did}/file?token=${encodeURIComponent(token)}`;
+                  // API may already include /api — build URL without duplicating it
+                  const base = (import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "");
+                  const proxyUrl = `${base}/api/documents/${doc.did}/file?token=${encodeURIComponent(token)}`;
                   if (isOffice) {
                     const msUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(proxyUrl)}`;
                     setDocViewer({ did: doc.did, name: doc.name, isImg: false, iframeUrl: msUrl, proxyUrl });
                   } else {
-                    // PDFs and images both served directly from proxy URL
                     setDocViewer({ did: doc.did, name: doc.name, isImg, proxyUrl, iframeUrl: proxyUrl });
                   }
                 };
@@ -208,7 +209,8 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                   onClick={async () => {
                     try {
                       const token = localStorage.getItem("estatepro_token") || "";
-                      const r = await fetch(`${API}/api/documents/${docViewer.did}/file?dl=1`, { headers: { Authorization: `Bearer ${token}` } });
+                      const base = (import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "");
+                      const r = await fetch(`${base}/api/documents/${docViewer.did}/file?dl=1`, { headers: { Authorization: `Bearer ${token}` } });
                       if (!r.ok) throw new Error();
                       const blob = await r.blob();
                       const blobUrl = URL.createObjectURL(blob);
