@@ -128,8 +128,9 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                     // Images: use Cloudinary URL directly
                     setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: true });
                   } else if (isPdf) {
-                    // Use Cloudinary URL directly — no fetch needed, avoids CORS on raw resources
-                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, isPdf: true });
+                    // PDFs via Google Docs Viewer — avoids Cloudinary Content-Disposition:attachment blank-page issue
+                    const gdocUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`;
+                    setDocViewer({ did: doc.did, url: doc.url, name: doc.name, isImg: false, iframeUrl: gdocUrl });
                   } else {
                     // Office docs: Google Viewer with Cloudinary URL
                     const gdocUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`;
@@ -215,12 +216,6 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "auto", padding: 16, background: "#111" }}>
                 <img src={docViewer.url} alt={docViewer.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 6 }} />
               </div>
-            ) : docViewer.isPdf ? (
-              <embed
-                src={docViewer.url}
-                type="application/pdf"
-                style={{ flex: 1, width: "100%", height: "100%", minHeight: 0, border: "none" }}
-              />
             ) : (
               <iframe
                 src={docViewer.iframeUrl}
