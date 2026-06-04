@@ -56,6 +56,14 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
     return { rentPaid: acc.rentPaid + rentPaid, depPaid: acc.depPaid + depPaid, maintCost: acc.maintCost + maintCost };
   }, { rentPaid: 0, depPaid: 0, maintCost: 0 });
 
+  // All active tenants with a balance owed
+  const balanceRows = allUnits.flatMap((u) => {
+    const a = u.tenants.find((t) => t.leaseStatus === "active");
+    if (!a || !(Number(a.balanceOwed) > 0)) return [];
+    return [{ unit: u, tenant: a, balance: Number(a.balanceOwed) }];
+  });
+  const totalBalanceOwed = balanceRows.reduce((s, r) => s + r.balance, 0);
+
   const scopeLabel = filterUnit
     ? allUnits.find((u) => u.uid === filterUnit)?.name
     : filterBlock
@@ -74,6 +82,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
         <StatCard label="Lease Alerts (≤30d)" val={dueSoonCount + overdueCount}                    accent={C.amber}    accentBg={C.amberBg} />
         <StatCard label="Total Rent Paid"     val={fmt(totalRentPaid)}                             accent={C.teal}     accentBg={C.tealBg}  />
         <StatCard label="Total Security Deposits" val={fmt(totalDepHeld)}                          accent={C.gold}     accentBg={C.goldBg}  />
+        <StatCard label="Total Balance Owed"   val={totalBalanceOwed > 0 ? fmt(totalBalanceOwed) : "None"} accent={totalBalanceOwed > 0 ? C.rose : C.sage} accentBg={totalBalanceOwed > 0 ? C.roseBg : C.sageBg} />
       </div>
 
       {/* ── Financial Breakdown (filterable) ── */}
@@ -127,6 +136,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
                 <th style={th}>Rent Paid</th>
                 <th style={th}>Security Deposit</th>
                 <th style={th}>Rent + Sec. Deposit</th>
+                <th style={th}>Balance Owed</th>
                 <th style={th}>Maint Cost</th>
               </tr>
             </thead>
@@ -136,6 +146,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
               )}
               {scopeUnits.map((u) => {
                 const { a, rentPaid, depPaid, maintCost } = calcUnit(u, maint);
+                const balance = a ? Number(a.balanceOwed) || 0 : 0;
                 return (
                   <tr key={u.uid}>
                     <td style={td}><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
@@ -144,6 +155,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
                     <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{fmt(rentPaid)}</td>
                     <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
                     <td style={{ ...td, fontWeight: 600 }}>{fmt(rentPaid + depPaid)}</td>
+                    <td style={{ ...td, color: balance > 0 ? C.rose : C.faint, fontWeight: balance > 0 ? 700 : 400 }}>{balance > 0 ? fmt(balance) : "—"}</td>
                     <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{maintCost > 0 ? fmt(maintCost) : "—"}</td>
                   </tr>
                 );
@@ -157,6 +169,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
                   <td style={{ ...td, fontWeight: 700, color: C.teal }}>{fmt(scopeTotals.rentPaid)}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.gold }}>{fmt(scopeTotals.depPaid)}</td>
                   <td style={{ ...td, fontWeight: 700 }}>{fmt(scopeTotals.rentPaid + scopeTotals.depPaid)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.rose }}>{fmt(scopeUnits.reduce((s,u)=>{ const a=u.tenants.find(t=>t.leaseStatus==="active"); return s+(Number(a?.balanceOwed)||0); },0) || 0)}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.rose }}>{scopeTotals.maintCost > 0 ? fmt(scopeTotals.maintCost) : "—"}</td>
                 </tr>
               </tfoot>
@@ -164,6 +177,63 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
           </table>
         </div>
       </div>
+
+      {/* ── Balance Owed by Tenants ── */}
+      {balanceRows.length > 0 && (
+        <div style={card}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <div style={cTitle}>⚠ Outstanding Balances</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Tenants with payments still outstanding</div>
+            </div>
+            <div style={{ background: C.roseBg, border: `1.5px solid ${C.rose}55`, borderRadius: 10, padding: "10px 18px", textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: C.rose }}>{fmt(totalBalanceOwed)}</div>
+              <div style={{ fontSize: 10, color: C.rose, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>Total Owed</div>
+            </div>
+          </div>
+          <div className="tbl-wrap">
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={th}>Block / Unit</th>
+                  <th style={th}>Tenant</th>
+                  <th style={th}>Monthly Rent</th>
+                  <th style={th}>Total Expected</th>
+                  <th style={th}>Balance Owed</th>
+                  <th style={th}>Amount Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                {balanceRows.map(({ unit: u, tenant: a, balance }) => {
+                  const advAmt  = Number(a.advanceAmount) || 0;
+                  const dep     = Number(a.depositAmount) || 0;
+                  const total   = advAmt + dep;
+                  const received = total - balance;
+                  return (
+                    <tr key={a.tid}>
+                      <td style={td}><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
+                      <td style={{ ...td, fontWeight: 600 }}>{a.name}</td>
+                      <td style={td}>{fmt(u.monthlyRent)}</td>
+                      <td style={td}>{total > 0 ? fmt(total) : <span style={{ color: C.faint }}>—</span>}</td>
+                      <td style={{ ...td, color: C.rose, fontWeight: 700 }}>{fmt(balance)}</td>
+                      <td style={{ ...td, color: C.sage, fontWeight: 600 }}>{total > 0 ? fmt(received) : <span style={{ color: C.faint }}>—</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {balanceRows.length > 1 && (
+                <tfoot>
+                  <tr style={{ background: C.panel }}>
+                    <td style={{ ...td, fontWeight: 700 }} colSpan={4}>Total</td>
+                    <td style={{ ...td, fontWeight: 700, color: C.rose }}>{fmt(totalBalanceOwed)}</td>
+                    <td style={{ ...td, fontWeight: 700, color: C.sage }}>{fmt(balanceRows.reduce((s,r)=>{ const t=(Number(r.tenant.advanceAmount)||0)+(Number(r.tenant.depositAmount)||0); return s+(t-r.balance); },0))}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Lease Reminders ── */}
       {reminderUnits.length > 0 && (
