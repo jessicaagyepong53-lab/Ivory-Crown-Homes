@@ -96,14 +96,13 @@ router.delete('/documents/:did', verifyJWT, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/documents/:did/file        — open file inline (view in new tab)
+// GET /api/documents/:did/file        — open file in new tab (view)
 // GET /api/documents/:did/file?dl=1  — download file
 //
-// Generates a signed Cloudinary CDN URL locally (no network call — just HMAC
-// using the API secret) then redirects the browser to it. The signed URL is
-// accepted by Cloudinary regardless of account security settings.
-// fl_inline  → Content-Disposition: inline  → browser renders PDF natively
-// fl_attachment → Content-Disposition: attachment → browser downloads with correct filename
+// Generates a signed Cloudinary CDN URL (pure local HMAC, no network call) and
+// redirects the browser to it.  fl_inline is intentionally NOT used — Cloudinary
+// returns 400 for that flag.  For viewing we rely on the browser's native PDF /
+// image handling when the new tab opens.
 router.get('/documents/:did/file', async (req, res, next) => {
   try {
     const block = await Block.findOne({
@@ -122,30 +121,29 @@ router.get('/documents/:did/file', async (req, res, next) => {
 
     const isDownload = req.query.dl === '1';
 
-    // Detect resource_type from the stored URL path, e.g. /raw/upload/ or /image/upload/
+    // Detect resource_type from the stored URL (e.g. /raw/upload/ or /image/upload/)
     const resTypeMatch = doc.url.match(/\/(image|video|raw)\/upload\//);
     const resourceType = resTypeMatch?.[1] ?? 'raw';
 
-    // Sanitise filename for the Cloudinary flag value (no spaces/quotes)
-    const safeName = (doc.name || 'file').replace(/[^\w.\-]/g, '_');
-    const flag = isDownload ? `attachment:${safeName}` : 'inline';
+    const options = {
+      secure: true,
+      resource_type: resourceType,
+      type: 'upload',
+      sign_url: true,
+    };
 
-    if (doc.cloudinaryId) {
-      // cloudinary.url() is a pure local computation — it signs the URL using
-      // the API secret without any network call. Safe, fast, always works.
-      const signedUrl = cloudinary.url(doc.cloudinaryId, {
-        secure: true,
-        resource_type: resourceType,
-        type: 'upload',
-        sign_url: true,
-        transformation: [{ flags: flag }],
-      });
-      return res.redirect(302, signedUrl);
+    if (isDownload) {
+      // fl_attachment forces Save dialog with the original filename
+      const safeName = (doc.name || 'file').replace(/[^\w.\-]/g, '_');
+      options.transformation = [{ flags: `attachment:${safeName}` }];
     }
+    // For view: no transformation — browser opens the file natively in the new tab
 
-    // Fallback: docs uploaded before cloudinaryId was saved — redirect to raw URL.
-    // These are publicly accessible (image-type resources, which have no auth requirement).
-    return res.redirect(302, doc.url);
+    const deliveryUrl = doc.cloudinaryId
+      ? cloudinary.url(doc.cloudinaryId, options)
+      : doc.url;
+
+    return res.redirect(302, deliveryUrl);
   } catch (err) { next(err); }
 });
 
