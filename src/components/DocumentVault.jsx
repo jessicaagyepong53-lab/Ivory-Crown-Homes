@@ -132,14 +132,10 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
                     try {
                       setPdfLoading(true);
                       setDocViewer({ did: doc.did, url: null, name: doc.name, isImg: false, isPdf: true });
-                      const token = localStorage.getItem("estatepro_token");
-                      const proxyUrl = `${API}/api/documents/${doc.did}/file`;
-                      const res = await fetch(proxyUrl, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      });
-                      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+                      // Fetch directly from Cloudinary CDN — no auth needed, public URL
+                      const res = await fetch(doc.url);
+                      if (!res.ok) throw new Error(`Could not fetch PDF (${res.status})`);
                       const blob = await res.blob();
-                      // createObjectURL works in the same window context — no iframe restriction
                       const blobUrl = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
                       setDocViewer({ did: doc.did, url: blobUrl, name: doc.name, isImg: false, isPdf: true });
                     } catch (err) {
@@ -160,10 +156,8 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
               function downloadDoc() {
                 const run = async () => {
                   try {
-                    const token = localStorage.getItem("estatepro_token");
-                    const res = await fetch(`${API}/api/documents/${doc.did}/file?dl=1`, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
-                    });
+                    // Fetch directly from Cloudinary — no auth needed
+                    const res = await fetch(doc.url);
                     if (!res.ok) throw new Error("Download failed");
                     const blob = await res.blob();
                     const blobUrl = URL.createObjectURL(blob);
@@ -226,7 +220,7 @@ export default function DocumentVault({ docs = [], onAdd, onDelete, requireAuth 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: "#111", borderBottom: "1px solid #333", flexShrink: 0 }}>
               <span style={{ fontSize: 13, color: "#ddd", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70%" }}>{docViewer.name}</span>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button onClick={async () => { const run = async () => { try { const token = localStorage.getItem("estatepro_token"); const res = await fetch(`${API}/api/documents/${docViewer.did}/file?dl=1`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }); if (!res.ok) throw new Error(); const blob = await res.blob(); const blobUrl = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = blobUrl; a.download = docViewer.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(blobUrl); } catch { alert("Download failed."); } }; if (requireAuth) requireAuth(run); else run(); }} style={{ background: "#2a6", border: "none", color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontFamily: "Georgia,serif" }}>⬇ Download</button>
+                <button onClick={async () => { try { const res = await fetch(docViewer.url); if (!res.ok) throw new Error(); const blob = await res.blob(); const blobUrl = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = blobUrl; a.download = docViewer.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(blobUrl); } catch { alert("Download failed."); } }} style={{ background: "#2a6", border: "none", color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontFamily: "Georgia,serif" }}>⬇ Download</button>
                 <button onClick={() => { if (docViewer?.isPdf && docViewer?.url) URL.revokeObjectURL(docViewer.url); setDocViewer(null); }} style={{ background: C.rose, border: "none", color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontFamily: "Georgia,serif", fontWeight: 700 }}>✕ Close</button>
               </div>
             </div>
