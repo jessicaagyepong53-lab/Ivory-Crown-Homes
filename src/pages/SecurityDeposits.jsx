@@ -106,7 +106,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
       </div>
 
       {/* Deposits table */}
-      <div style={card}>
+      <div className="app-card" style={card}>
         <div className="tbl-wrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -201,7 +201,7 @@ export default function SecurityDeposits({ allUnits, occupiedUnits, activeTenant
 
       {/* Past Tenant Deposits */}
       {pastDepRows.length > 0 && (
-        <div style={{ ...card, marginTop: 18 }}>
+        <div className="app-card" style={{ ...card, marginTop: 18 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.muted, marginBottom: 12 }}>Past Tenant Deposits</div>
           <div className="tbl-wrap">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

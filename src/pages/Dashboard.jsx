@@ -88,7 +88,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
       </div>
 
       {/* ── Financial Breakdown (filterable) ── */}
-      <div style={card}>
+      <div className="app-card" style={card}>
         {/* Header + filters */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
@@ -182,7 +182,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
 
       {/* ── Balance Owed by Tenants ── */}
       {balanceRows.length > 0 && (
-        <div style={card}>
+        <div className="app-card" style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
             <div>
               <div style={cTitle}>⚠ Outstanding Balances</div>
@@ -237,7 +237,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
                       <td style={{ ...td, color: C.rose, fontWeight: 700 }}>{fmt(balance)}</td>
                       <td style={td}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <div className="pay-input-row" style={{ display: "flex", gap: 6, alignItems: "center" }}>
                             <input
                               type="number"
                               min="0"
@@ -289,7 +289,7 @@ export default function Dashboard({ totalRev, occupiedUnits, allUnits, blocks, m
 
       {/* ── Lease Reminders ── */}
       {reminderUnits.length > 0 && (
-        <div style={card}>
+        <div className="app-card" style={card}>
           <div style={cTitle}>⚠ Active Lease Reminders</div>
           <div className="tbl-wrap">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

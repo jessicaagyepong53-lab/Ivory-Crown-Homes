@@ -62,7 +62,7 @@ export default function Maintenance({ maint, blocks, allUnits, requireAuth, onUp
       </div>
 
       {/* Maintenance table */}
-      <div style={card}>
+      <div className="app-card" style={card}>
         <div className="tbl-wrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>

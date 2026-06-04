@@ -173,7 +173,7 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onSav
         {/* Expanded panel */}
         {open && (
           <div style={{ borderTop: `1px solid ${C.borderLight}`, background: C.deep }}>
-            <div style={{ display: "flex", gap: 2, padding: "10px 15px 0", background: C.panel, borderBottom: `1px solid ${C.borderLight}` }}>
+            <div className="tenant-tab-bar" style={{ display: "flex", gap: 2, padding: "10px 15px 0", background: C.panel, borderBottom: `1px solid ${C.borderLight}` }}>
               <TabBtn id="profile" label="Profile & Details" />
               <TabBtn id="documents" label="Documents" count={localDocs.length} />
             </div>

@@ -126,7 +126,7 @@ export default function Settings({ requireAuth, isAuthenticated }) {
       <p style={{ fontSize: 13, color: C.muted, marginBottom: 28 }}>Manage your application preferences.</p>
 
       {/* PIN change card */}
-      <div style={{ ...card, maxWidth: 500 }}>
+      <div className="app-card" style={{ ...card, maxWidth: 500 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: C.teal, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 }}>
           🔑 Change Access PIN
         </div>
@@ -179,7 +179,7 @@ export default function Settings({ requireAuth, isAuthenticated }) {
       </div>
 
       {/* Info card */}
-      <div style={{ ...card, maxWidth: 500, marginTop: 0 }}>
+      <div className="app-card" style={{ ...card, maxWidth: 500, marginTop: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: C.lavender, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 12 }}>
           ℹ How PIN Protection Works
         </div>
@@ -190,7 +190,7 @@ export default function Settings({ requireAuth, isAuthenticated }) {
             ["🔒 Session", "Once logged in, edits are unlocked for the current session. Closing or refreshing the page resets this."],
             ["⚙  Reset",  "Forgotten your PIN? Set a new one right here on this Settings page — no old PIN needed."],
           ].map(([label, text]) => (
-            <div key={label} style={{ display: "flex", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
+            <div key={label} className="settings-info-item" style={{ display: "flex", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
               <span style={{ fontWeight: 700, color: C.muted, minWidth: 90 }}>{label}</span>
               <span style={{ color: C.text }}>{text}</span>
             </div>
@@ -199,7 +199,7 @@ export default function Settings({ requireAuth, isAuthenticated }) {
       </div>
 
       {/* ── Trash Bin ──────────────────────────────────────────────────────── */}
-      <div style={{ ...card, marginTop: 0 }}>
+      <div className="app-card" style={{ ...card, marginTop: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 20 }}>🗑</span>

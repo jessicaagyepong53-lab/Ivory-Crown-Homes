@@ -75,7 +75,7 @@ export default function LeaseFilter({ allTenants, filteredTenants, allYears, fil
       </div>
 
       {/* Results table */}
-      <div style={card}>
+      <div className="app-card" style={card}>
         <div style={{ ...cTitle, marginBottom: 12 }}>
           {filteredTenants.length} Tenant{filteredTenants.length !== 1 ? "s" : ""} Found
           {filterYA && <span style={{ color: C.muted, fontWeight: 400 }}> — {filterYA}{filterYB && filterYB !== filterYA ? `–${filterYB}` : ""}</span>}

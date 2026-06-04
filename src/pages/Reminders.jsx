@@ -32,7 +32,7 @@ export default function Reminders({ allUnits }) {
 
       {/* Should Vacate — expired leases */}
       {vacateUnits.length > 0 && (
-        <div style={{ ...card, border: `1px solid ${C.rose}44`, background: C.roseBg + "66", marginBottom: 16 }}>
+          <div className="app-card" style={{ ...card, border: `1px solid ${C.rose}44`, background: C.roseBg + "66", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <span style={{ fontSize: 18 }}>🏠</span>
             <div>
@@ -73,7 +73,7 @@ export default function Reminders({ allUnits }) {
       </div>
 
       {/* All active leases table */}
-      <div style={card}>
+      <div className="app-card" style={card}>
         <div style={cTitle}>All Active Leases</div>
         {sorted.length === 0 ? (
           <div style={{ fontSize: 13, color: C.muted }}>No active leases.</div>
@@ -107,7 +107,7 @@ export default function Reminders({ allUnits }) {
       </div>
 
       {/* 3-month advance reminders */}
-      <div style={card}>
+      <div className="app-card" style={card}>
         <div style={cTitle}>Expiring Within 3 Months</div>
         {upcoming90.length === 0 ? (
           <div style={{ fontSize: 13, color: C.muted }}>None in the next 90 days.</div>

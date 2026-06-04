@@ -79,6 +79,7 @@ export default function LoginPage({ onLogin, onCancel }) {
 
       {/* PIN card */}
       <div
+        className="login-pin-card"
         style={{
           background: C.surface,
           border: `1px solid ${C.border}`,

@@ -63,7 +63,7 @@ export default function NotificationBell({ allUnits }) {
 
       {/* Dropdown panel */}
       {open && (
-        <div style={{ position: "absolute", right: 0, top: 46, width: 340, maxWidth: "calc(100vw - 16px)", background: "#fffdf9", border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,0.14)", zIndex: 200, maxHeight: "80vh", overflowY: "auto", overflowX: "hidden", fontFamily: "Georgia,serif" }}>
+        <div className="notif-dropdown" style={{ position: "absolute", right: 0, top: 46, width: 340, maxWidth: "calc(100vw - 16px)", background: "#fffdf9", border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,0.14)", zIndex: 200, maxHeight: "80vh", overflowY: "auto", overflowX: "hidden", fontFamily: "Georgia,serif" }}>
           {/* Header */}
           <div style={{ padding: "13px 16px", borderBottom: `1px solid ${C.borderLight}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontWeight: 700, fontSize: 13, color: C.text }}>🔔 Lease Notifications</span>
