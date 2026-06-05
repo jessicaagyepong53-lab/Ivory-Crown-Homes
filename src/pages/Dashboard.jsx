@@ -42,19 +42,17 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
 
   const scopeTotals = scopeUnits.reduce((acc, u) => {
     const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
-    const rentPaid  = u.tenants.reduce((s, t) => {
-      const logTotal = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
-      const current  = Math.max(0, (logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0)) - (Number(t.refundAmount) || 0));
-      const histPaid = (t.leaseHistory || []).reduce((hs, h) => hs + (Number(h.advanceAmount) || 0), 0);
-      return s + current + histPaid;
-    }, 0);
-    const depPaid   = u.tenants.reduce((s, t) => {
-      const cur  = t.depositPaid ? (t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent) : 0;
-      const hist = (t.leaseHistory || []).reduce((hs, h) => hs + (h.depositPaid ? (Number(h.depositAmount) || 0) : 0), 0);
-      return s + cur + hist;
-    }, 0);
-    return { rentPaid: acc.rentPaid + rentPaid, depPaid: acc.depPaid + depPaid, maintCost: acc.maintCost + maintCost };
-  }, { rentPaid: 0, depPaid: 0, maintCost: 0 });
+    const { grossRent, totalRefunds, depPaid } = u.tenants.reduce((s, t) => {
+      const logTotal  = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
+      const gross     = logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0);
+      const refund    = Number(t.refundAmount) || 0;
+      const histGross = (t.leaseHistory || []).reduce((hs, h) => hs + (Number(h.advanceAmount) || 0), 0);
+      const dep       = t.depositPaid ? (t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent) : 0;
+      const histDep   = (t.leaseHistory || []).reduce((hs, h) => hs + (h.depositPaid ? (Number(h.depositAmount) || 0) : 0), 0);
+      return { grossRent: s.grossRent + gross + histGross, totalRefunds: s.totalRefunds + refund, depPaid: s.depPaid + dep + histDep };
+    }, { grossRent: 0, totalRefunds: 0, depPaid: 0 });
+    return { grossRent: acc.grossRent + grossRent, totalRefunds: acc.totalRefunds + totalRefunds, depPaid: acc.depPaid + depPaid, maintCost: acc.maintCost + maintCost };
+  }, { grossRent: 0, totalRefunds: 0, depPaid: 0, maintCost: 0 });
 
   // All active tenants with a balance owed
   const balanceRows = allUnits.flatMap((u) => {
@@ -120,10 +118,11 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
 
         {/* Scope summary cards */}
         <div className="stat-grid" style={{ ...sGrid, marginBottom: 20 }}>
-          <StatCard label="Rent Paid"        val={fmt(scopeTotals.rentPaid)}                          accent={C.teal}  accentBg={C.tealBg}  />
-          <StatCard label="Security Deposits"     val={fmt(scopeTotals.depPaid)}                        accent={C.gold}  accentBg={C.goldBg}  />
-          <StatCard label="Rent + Security Deposit" val={fmt(scopeTotals.rentPaid + scopeTotals.depPaid)} accent={C.sky}   accentBg={C.skyBg}   />
-          <StatCard label="Maintenance Cost" val={fmt(scopeTotals.maintCost)}                         accent={C.rose}  accentBg={C.roseBg}  />
+          <StatCard label="Gross Rent Collected"  val={fmt(scopeTotals.grossRent)}                                                    accent={C.teal}  accentBg={C.tealBg}  />
+          <StatCard label="Total Refunds"          val={scopeTotals.totalRefunds > 0 ? fmt(scopeTotals.totalRefunds) : "None"}         accent={C.rose}  accentBg={C.roseBg}  />
+          <StatCard label="Security Deposits"      val={fmt(scopeTotals.depPaid)}                                                      accent={C.gold}  accentBg={C.goldBg}  />
+          <StatCard label="Total Earned (Net)"     val={fmt(scopeTotals.grossRent - scopeTotals.totalRefunds + scopeTotals.depPaid)}   accent={C.sky}   accentBg={C.skyBg}   />
+          <StatCard label="Maintenance Cost"       val={fmt(scopeTotals.maintCost)}                                                    accent={C.rose}  accentBg={C.roseBg}  />
         </div>
 
         {/* Breakdown table */}
@@ -135,15 +134,16 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                 <th style={th}>Tenant</th>
                 <th style={th}>Monthly Rent</th>
                 <th style={th}>Rent Paid</th>
+                <th style={th}>Refund</th>
                 <th style={th}>Security Deposit</th>
-                <th style={th}>Rent + Sec. Deposit</th>
+                <th style={th}>Total Earned</th>
                 <th style={th}>Balance Owed</th>
                 <th style={th}>Maint Cost</th>
               </tr>
             </thead>
             <tbody>
               {scopeUnits.length === 0 && (
-                <tr><td colSpan={8} style={{ ...td, textAlign: "center", color: C.muted, padding: 28 }}>No units match the selected filter.</td></tr>
+                <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: C.muted, padding: 28 }}>No units match the selected filter.</td></tr>
               )}
               {scopeUnits.flatMap((u) => {
                 const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
@@ -152,7 +152,7 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                     <td style={td}><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
                     <td style={td}><span style={{ color: C.faint, fontStyle: "italic" }}>Vacant</span></td>
                     <td style={td}>{fmt(u.monthlyRent)}</td>
-                    <td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} />
+                    <td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} />
                   </tr>
                 )];
                 // Expand tenant + all lease history periods into rows
@@ -168,15 +168,15 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                   }))
                 ]);
                 return allPeriods.map((t, i) => {
-                  const isActive = t.leaseStatus === "active";
-                  const logTotal = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
-                  const rentPaid = Math.max(0,
-                    (logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0))
-                    - (Number(t.refundAmount) || 0)
-                  );
-                  const depAmt   = t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent;
-                  const depPaid  = t.depositPaid ? depAmt : 0;
-                  const balance  = isActive ? (Number(t.balanceOwed) || 0) : 0;
+                  const isActive  = t.leaseStatus === "active";
+                  const logTotal  = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
+                  const grossRent = logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0);
+                  const refund    = Number(t.refundAmount) || 0;
+                  const netRent   = Math.max(0, grossRent - refund);
+                  const depAmt    = t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent;
+                  const depPaid   = t.depositPaid ? depAmt : 0;
+                  const totalEarned = netRent + depPaid;
+                  const balance   = isActive ? (Number(t.balanceOwed) || 0) : 0;
                   const sy = t.leaseStart ? new Date(t.leaseStart).getFullYear() : "";
                   const ey = (t.leaseEnd || t.cancelDate) ? new Date(t.leaseEnd || t.cancelDate).getFullYear() : "";
                   const period = sy && ey && sy !== ey ? `${sy}–${ey}` : `${sy}`;
@@ -192,9 +192,10 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                         {!isActive && period && <span style={{ fontSize: 10, color: C.lavender, marginLeft: 6, background: C.lavBg, borderRadius: 4, padding: "1px 5px" }}>{period}</span>}
                       </td>
                       <td style={td}>{fmt(Number(t.monthlyRent) || u.monthlyRent)}</td>
-                      <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{rentPaid > 0 ? fmt(rentPaid) : <span style={{ color: C.faint }}>—</span>}</td>
+                      <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{grossRent > 0 ? fmt(grossRent) : <span style={{ color: C.faint }}>—</span>}</td>
+                      <td style={{ ...td, color: C.rose, fontWeight: refund > 0 ? 600 : 400 }}>{refund > 0 ? `-${fmt(refund)}` : <span style={{ color: C.faint }}>—</span>}</td>
                       <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
-                      <td style={{ ...td, fontWeight: 600 }}>{fmt(rentPaid + depPaid)}</td>
+                      <td style={{ ...td, fontWeight: 700, color: totalEarned > 0 ? C.sage : C.faint }}>{totalEarned > 0 ? fmt(totalEarned) : "—"}</td>
                       <td style={{ ...td, color: balance > 0 ? C.rose : C.faint, fontWeight: balance > 0 ? 700 : 400 }}>{balance > 0 ? fmt(balance) : "—"}</td>
                       <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{i === 0 && maintCost > 0 ? fmt(maintCost) : "—"}</td>
                     </tr>
@@ -207,9 +208,10 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                 <tr style={{ background: C.panel }}>
                   <td style={{ ...td, fontWeight: 700, color: C.text }} colSpan={2}>Totals</td>
                   <td style={{ ...td, fontWeight: 700 }}>{fmt(scopeUnits.reduce((s, u) => s + u.tenants.reduce((ts, t) => ts + (Number(t.monthlyRent) || u.monthlyRent || 0), 0), 0))}</td>
-                  <td style={{ ...td, fontWeight: 700, color: C.teal }}>{fmt(scopeTotals.rentPaid)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.teal }}>{fmt(scopeTotals.grossRent)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.rose }}>{scopeTotals.totalRefunds > 0 ? `-${fmt(scopeTotals.totalRefunds)}` : "—"}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.gold }}>{fmt(scopeTotals.depPaid)}</td>
-                  <td style={{ ...td, fontWeight: 700 }}>{fmt(scopeTotals.rentPaid + scopeTotals.depPaid)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.sage }}>{fmt(scopeTotals.grossRent - scopeTotals.totalRefunds + scopeTotals.depPaid)}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.rose }}>{fmt(scopeUnits.reduce((s,u)=>{ const a=u.tenants.find(t=>t.leaseStatus==="active"); return s+(Number(a?.balanceOwed)||0); },0) || 0)}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.rose }}>{scopeTotals.maintCost > 0 ? fmt(scopeTotals.maintCost) : "—"}</td>
                 </tr>
