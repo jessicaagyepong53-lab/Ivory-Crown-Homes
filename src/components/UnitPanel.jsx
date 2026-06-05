@@ -17,7 +17,7 @@ const emptyNewT = {
   vehicles: "", notes: "", depositPaid: false, depositAmount: "", documents: [],
 };
 
-export default function UnitPanel({ unit, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onDeleteUnit, onRenew }) {
+export default function UnitPanel({ unit, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onDeleteUnit, onRenew, onBlockChange }) {
   const [open, setOpen] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newT, setNewT] = useState(emptyNewT);
@@ -107,6 +107,7 @@ export default function UnitPanel({ unit, requireAuth, onEndLease, onTerminateLe
               onTerminateLease={(tid, reason, endDate, refundAmount) => onTerminateLease(unit.uid, tid, reason, endDate, refundAmount)}
               onSave={(u) => onSaveTenant(unit.uid, u)}
               onRenew={onRenew}
+              onBlockChange={onBlockChange}
             />
           ) : (
             <div style={{ fontSize: 13, color: C.muted, paddingBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>

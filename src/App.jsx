@@ -391,6 +391,7 @@ export default function App() {
             onDeleteBlock={withAuth(deleteBlock)}
             onAddBlock={withAuth(addBlock)}
             onRenew={handleRenew}
+            onBlockChange={(block) => setBlocks((prev) => prev.map((b) => b.bid === block.bid ? block : b))}
           />
         )}
 

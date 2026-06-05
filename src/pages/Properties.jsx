@@ -5,7 +5,7 @@ import Btn from "../components/ui/Btn";
 import BlockCard from "../components/BlockCard";
 import { getLeaseStatus } from "../utils/helpers";
 
-function PropertyGroup({ address, blocks, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onRenew }) {
+function PropertyGroup({ address, blocks, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onRenew, onBlockChange }) {
   const [open, setOpen] = useState(true);
   const totalUnits = blocks.reduce((s, b) => s + b.units.length, 0);
   const occUnits   = blocks.reduce((s, b) => s + b.units.filter(u => u.tenants.some(t => getLeaseStatus(t) === "active")).length, 0);
@@ -41,6 +41,7 @@ function PropertyGroup({ address, blocks, requireAuth, onEndLease, onTerminateLe
               onDeleteUnit={onDeleteUnit}
               onDeleteBlock={onDeleteBlock}
               onRenew={onRenew}
+              onBlockChange={onBlockChange}
             />
           ))}
         </div>
@@ -49,7 +50,7 @@ function PropertyGroup({ address, blocks, requireAuth, onEndLease, onTerminateLe
   );
 }
 
-export default function Properties({ blocks, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onAddBlock, onRenew }) {
+export default function Properties({ blocks, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onAddBlock, onRenew, onBlockChange }) {
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [newBlock, setNewBlock] = useState({ name: "", type: "block", address: "" });
 
@@ -93,6 +94,7 @@ export default function Properties({ blocks, requireAuth, onEndLease, onTerminat
           onDeleteUnit={onDeleteUnit}
           onDeleteBlock={onDeleteBlock}
           onRenew={onRenew}
+          onBlockChange={onBlockChange}
         />
       ))}
 

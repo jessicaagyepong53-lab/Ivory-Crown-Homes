@@ -9,7 +9,7 @@ import Badge from "./ui/Badge";
 import SLabel from "./ui/SLabel";
 import UnitPanel from "./UnitPanel";
 
-export default function BlockCard({ block, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onRenew }) {
+export default function BlockCard({ block, requireAuth, onEndLease, onTerminateLease, onSaveTenant, onAddTenant, onAddUnit, onDeleteUnit, onDeleteBlock, onRenew, onBlockChange }) {
   const [open, setOpen] = useState(false);
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newU, setNewU] = useState({ name: "", type: "1-Bedroom", monthlyRent: "" });
@@ -108,6 +108,7 @@ export default function BlockCard({ block, requireAuth, onEndLease, onTerminateL
                 onAddTenant={onAddTenant}
                 onDeleteUnit={onDeleteUnit}
                 onRenew={onRenew}
+                onBlockChange={onBlockChange}
               />
             ))
           )}

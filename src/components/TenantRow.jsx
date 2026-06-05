@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { uploadDocument, deleteDocument } from "../api/documents.js";
 import { renewTenant, addPayment, removePayment } from "../api/blocks.js";
 import { C } from "../constants/colors";
@@ -17,7 +17,7 @@ import RenewLeaseModal from "./RenewLeaseModal";
 import TerminateLeaseModal from "./TerminateLeaseModal";
 import DocumentVault from "./DocumentVault";
 
-export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onTerminateLease, onSave, onRenew }) {
+export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onTerminateLease, onSave, onRenew, onBlockChange }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
@@ -28,6 +28,10 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onTer
   const [showTerminateModal, setShowTerminateModal] = useState(false);
   const [localDocs,     setLocalDocs]     = useState(t.documents || []);
   const [localPayments, setLocalPayments] = useState(t.payments  || []);
+
+  // Sync local state when parent blocks update (e.g. via Socket.IO from another session)
+  useEffect(() => { setLocalPayments(t.payments  || []); }, [t.tid, (t.payments  || []).length]);
+  useEffect(() => { setLocalDocs(t.documents    || []); }, [t.tid, (t.documents || []).length]);
   const [newPayAmt,     setNewPayAmt]     = useState("");
   const [newPayDate,    setNewPayDate]    = useState(today.toISOString().slice(0, 10));
   const [newPayNote,    setNewPayNote]    = useState("");
@@ -91,6 +95,7 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onTer
       const block = await addPayment(t.tid, { amount: Number(newPayAmt), date: newPayDate, note: newPayNote.trim() });
       const updated = block.units.flatMap((u) => u.tenants).find((x) => x.tid === t.tid);
       if (updated) setLocalPayments(updated.payments || []);
+      if (onBlockChange) onBlockChange(block);
       setNewPayAmt(""); setNewPayNote("");
       toast("Payment recorded.", "save");
     } catch { toast("Failed to record payment.", "error"); }
@@ -102,6 +107,7 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onTer
       const block = await removePayment(t.tid, pid);
       const updated = block.units.flatMap((u) => u.tenants).find((x) => x.tid === t.tid);
       if (updated) setLocalPayments(updated.payments || []);
+      if (onBlockChange) onBlockChange(block);
       toast("Payment removed.", "delete");
     } catch { toast("Failed to remove payment.", "error"); }
   }
