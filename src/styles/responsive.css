@@ -103,12 +103,38 @@ body { margin: 0; }
   .add-tenant-grid { grid-template-columns: 1fr !important; }
 
   /* ── TenantRow: header action buttons ───────────────────────────────────── */
-  .tenant-actions {
+  /* Wrap the header so buttons drop to a second row below the tenant name */
+  .tenant-header {
     flex-wrap: wrap !important;
-    gap: 5px !important;
-    justify-content: flex-end !important;
+    align-items: flex-start !important;
+    gap: 4px 11px !important;
+    padding: 10px 12px !important;
   }
-  .tenant-actions button { font-size: 11px !important; padding: 6px 10px !important; }
+  /* Clickable name area stays on row 1 and takes all available space */
+  .tenant-header > div:first-child {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+  /* Chevron stays on row 1, right side */
+  .tenant-header > span:last-child {
+    flex-shrink: 0 !important;
+    order: 1 !important;
+  }
+  /* Buttons drop to row 2, full width, right-aligned */
+  .tenant-actions {
+    order: 2 !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    gap: 5px !important;
+    padding: 2px 0 4px !important;
+  }
+  .tenant-actions button {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    white-space: nowrap !important;
+  }
 
   /* ── TenantRow: tab bar — wrap on small screens ─────────────────────────── */
   .tenant-tab-bar { flex-wrap: wrap !important; padding: 6px 10px 0 !important; gap: 2px !important; }
@@ -207,6 +233,12 @@ body { margin: 0; }
 
   /* ── Page header ─────────────────────────────────────────────────────────── */
   .page-header { flex-wrap: wrap !important; gap: 10px !important; }
+
+  /* ── TenantRow action buttons — smaller on tablet but stay on same row ─── */
+  .tenant-actions button {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+  }
 
   /* ── Notification dropdown: clamp so it never overflows left edge ────────── */
   .notif-dropdown {

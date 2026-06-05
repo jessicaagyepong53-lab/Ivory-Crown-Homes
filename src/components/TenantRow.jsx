@@ -167,7 +167,7 @@ export default function TenantRow({ t, isCurrent, requireAuth, onEndLease, onTer
       <div style={{ background: isCurrent ? "#fff" : C.panel, border: `1px solid ${isCurrent ? C.border : C.borderLight}`, borderRadius: 10, marginBottom: 7, overflow: "hidden", boxShadow: isCurrent ? "0 1px 6px rgba(74,157,143,0.08)" : "none" }}>
 
         {/* Collapsed header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 15px" }}>
+        <div className="tenant-header" style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 15px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, flex: 1, cursor: "pointer", minWidth: 0 }} onClick={() => setOpen((o) => !o)}>
             <Avatar name={t.name} size={34} />
             <div style={{ flex: 1, minWidth: 0 }}>
