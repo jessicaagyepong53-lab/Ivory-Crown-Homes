@@ -52,9 +52,18 @@ function txMaint(m) {
   const { _id, __v, createdAt, updatedAt, ...rest } = obj;
   return {
     id: _id.toString(),
-    blockId: rest.blockId?.toString(),
-    unitId:  rest.unitId?.toString(),
     ...rest,
+    blockId: rest.blockId?.toString(),
+    blockIds: (rest.blockIds || []).map((id) => id?.toString()),
+    unitId:  rest.unitId?.toString(),
+    attachments: (rest.attachments || []).map((a) => {
+      const attachment = a.toObject ? a.toObject() : a;
+      const { _id: aid, ...attachmentRest } = attachment;
+      return {
+        aid: aid?.toString(),
+        ...attachmentRest,
+      };
+    }),
   };
 }
 

@@ -40,8 +40,42 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
 
   function onBlockChange(bid) { setFilterBlock(bid); setFilterUnit(""); }
 
+  const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const maintenanceThisMonth = maint
+    .filter((m) => (m.reportedDate || "").slice(0, 7) === monthKey && m.status !== "Cancelled")
+    .reduce((sum, m) => sum + (Number(m.cost) || 0), 0);
+  const netMonthlyRevenue = totalRev - maintenanceThisMonth;
+
+  function maintMatchesBlock(m, bid) {
+    const blockIds = Array.isArray(m.blockIds) ? m.blockIds.map(String) : [];
+    return String(m.blockId || "") === String(bid) || blockIds.includes(String(bid));
+  }
+
+  function maintenanceCostForUnit(unit) {
+    return maint
+      .filter((m) => m.unitId === unit.uid)
+      .reduce((sum, m) => sum + (m.cost || 0), 0);
+  }
+
+  function maintenanceCostForScope(units) {
+    if (filterUnit) {
+      return units.reduce((sum, u) => sum + maintenanceCostForUnit(u), 0);
+    }
+    if (filterBlock) {
+      return maint
+        .filter((m) => maintMatchesBlock(m, filterBlock))
+        .reduce((sum, m) => sum + (m.cost || 0), 0);
+    }
+    return maint.reduce((sum, m) => sum + (m.cost || 0), 0);
+  }
+
+  function blockMaintenanceCost(blockId) {
+    return maint
+      .filter((m) => m.targetScope === "block" && maintMatchesBlock(m, blockId))
+      .reduce((sum, m) => sum + (m.cost || 0), 0);
+  }
+
   const scopeTotals = scopeUnits.reduce((acc, u) => {
-    const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
     const { grossRent, totalRefunds, depPaid } = u.tenants.reduce((s, t) => {
       const logTotal  = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
       const gross     = logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0);
@@ -51,8 +85,9 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
       const histDep   = (t.leaseHistory || []).reduce((hs, h) => hs + (h.depositPaid ? (Number(h.depositAmount) || 0) : 0), 0);
       return { grossRent: s.grossRent + gross + histGross, totalRefunds: s.totalRefunds + refund, depPaid: s.depPaid + dep + histDep };
     }, { grossRent: 0, totalRefunds: 0, depPaid: 0 });
-    return { grossRent: acc.grossRent + grossRent, totalRefunds: acc.totalRefunds + totalRefunds, depPaid: acc.depPaid + depPaid, maintCost: acc.maintCost + maintCost };
-  }, { grossRent: 0, totalRefunds: 0, depPaid: 0, maintCost: 0 });
+    return { grossRent: acc.grossRent + grossRent, totalRefunds: acc.totalRefunds + totalRefunds, depPaid: acc.depPaid + depPaid };
+  }, { grossRent: 0, totalRefunds: 0, depPaid: 0 });
+  const scopeMaintCost = maintenanceCostForScope(scopeUnits);
 
   // All active tenants with a balance owed
   const balanceRows = allUnits.flatMap((u) => {
@@ -61,6 +96,14 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
     return [{ unit: u, tenant: a, balance: Number(a.balanceOwed) }];
   });
   const totalBalanceOwed = balanceRows.reduce((s, r) => s + r.balance, 0);
+
+  const groupedBlocks = filterUnit
+    ? [{ block: blocks.find((b) => b.bid === filterBlock) || { bid: filterBlock, name: "Selected Block" }, units: scopeUnits }]
+    : (filterBlock
+      ? [{ block: blocks.find((b) => b.bid === filterBlock) || { bid: filterBlock, name: "Selected Block" }, units: scopeUnits }]
+      : blocks
+        .map((block) => ({ block, units: scopeUnits.filter((u) => u.blockId === block.bid) }))
+        .filter(({ units }) => units.length > 0));
 
   const scopeLabel = filterUnit
     ? allUnits.find((u) => u.uid === filterUnit)?.name
@@ -72,9 +115,10 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
     <>
       {/* ── Global stat cards ── */}
       <div className="stat-grid" style={sGrid}>
-        <StatCard label="Current Monthly Revenue"  val={fmt(totalRev)}                                  accent={C.gold}     accentBg={C.goldBg}  />
+        <StatCard label="Current Monthly Revenue (Net)"  val={fmt(netMonthlyRevenue)}                       accent={C.gold}     accentBg={C.goldBg}  />
+        <StatCard label="Maintenance This Month"   val={fmt(maintenanceThisMonth)}                          accent={C.rose}     accentBg={C.roseBg}  />
         <StatCard label="Total Monthly Rent (All)"  val={fmt(totalMonthlyRent)}                          accent={C.teal}     accentBg={C.tealBg}  />
-        <StatCard label="Annual Revenue"            val={fmt(totalRev * 12)}                             accent={C.sky}      accentBg={C.skyBg}   />
+        <StatCard label="Annual Revenue (Net Est.)"  val={fmt(netMonthlyRevenue * 12)}                    accent={C.sky}      accentBg={C.skyBg}   />
         <StatCard label="Occupied Units"      val={`${occupiedUnits.length}/${allUnits.length}`}   accent={C.sage}     accentBg={C.sageBg}  />
         <StatCard label="Blocks / Properties" val={blocks.length}                                  accent={C.lavender} accentBg={C.lavBg}   />
         <StatCard label="Pending Maintenance" val={maint.filter((m) => m.status === "Pending").length} accent={C.rose} accentBg={C.roseBg} />
@@ -122,7 +166,7 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
           <StatCard label="Total Refunds"          val={scopeTotals.totalRefunds > 0 ? fmt(scopeTotals.totalRefunds) : "None"}         accent={C.rose}  accentBg={C.roseBg}  />
           <StatCard label="Security Deposits"      val={fmt(scopeTotals.depPaid)}                                                      accent={C.gold}  accentBg={C.goldBg}  />
           <StatCard label="Total Earned (Net)"     val={fmt(scopeTotals.grossRent - scopeTotals.totalRefunds + scopeTotals.depPaid)}   accent={C.sky}   accentBg={C.skyBg}   />
-          <StatCard label="Maintenance Cost"       val={fmt(scopeTotals.maintCost)}                                                    accent={C.rose}  accentBg={C.roseBg}  />
+          <StatCard label="Maintenance Cost"       val={fmt(scopeMaintCost)}                                                           accent={C.rose}  accentBg={C.roseBg}  />
         </div>
 
         {/* Breakdown table */}
@@ -145,62 +189,81 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
               {scopeUnits.length === 0 && (
                 <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: C.muted, padding: 28 }}>No units match the selected filter.</td></tr>
               )}
-              {scopeUnits.flatMap((u) => {
-                const maintCost = maint.filter((m) => m.unitId === u.uid).reduce((s, m) => s + (m.cost || 0), 0);
-                if (u.tenants.length === 0) return [(
-                  <tr key={u.uid}>
-                    <td style={td}><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></td>
-                    <td style={td}><span style={{ color: C.faint, fontStyle: "italic" }}>Vacant</span></td>
-                    <td style={td}>{fmt(u.monthlyRent)}</td>
-                    <td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} />
+              {groupedBlocks.flatMap(({ block, units }) => {
+                const sharedMaintCost = blockMaintenanceCost(block.bid);
+                const blockRows = [(
+                  <tr key={`block-${block.bid}`} style={{ background: C.panel }}>
+                    <td style={{ ...td, fontWeight: 700, color: C.text }}>{block.name}</td>
+                    <td style={{ ...td, color: C.muted }} colSpan={6}>{units.length} unit{units.length !== 1 ? "s" : ""}</td>
+                    <td style={{ ...td, color: C.muted }} />
+                    <td style={{ ...td, fontWeight: 700, color: sharedMaintCost > 0 ? C.rose : C.faint }}>{sharedMaintCost > 0 ? fmt(sharedMaintCost) : "—"}</td>
                   </tr>
                 )];
-                // Expand tenant + all lease history periods into rows
-                const allPeriods = u.tenants.flatMap((t) => [
-                  t,
-                  ...(t.leaseHistory || []).map((h, hi) => ({
-                    ...h,
-                    tid: `${t.tid}-h${hi}`,
-                    name: t.name,
-                    leaseStatus: 'ended',
-                    payments: [],
-                    refundAmount: 0,
-                  }))
-                ]);
-                return allPeriods.map((t, i) => {
-                  const isActive  = t.leaseStatus === "active";
-                  const logTotal  = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
-                  const grossRent = logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0);
-                  const refund    = Number(t.refundAmount) || 0;
-                  const netRent   = Math.max(0, grossRent - refund);
-                  const depAmt    = t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent;
-                  const depPaid   = t.depositPaid ? depAmt : 0;
-                  const totalEarned = netRent + depPaid;
-                  const balance   = isActive ? (Number(t.balanceOwed) || 0) : 0;
-                  const sy = t.leaseStart ? new Date(t.leaseStart).getFullYear() : "";
-                  const ey = (t.leaseEnd || t.cancelDate) ? new Date(t.leaseEnd || t.cancelDate).getFullYear() : "";
-                  const period = sy && ey && sy !== ey ? `${sy}–${ey}` : `${sy}`;
-                  return (
-                    <tr key={t.tid || `${u.uid}-${i}`} style={{ opacity: isActive ? 1 : 0.75, background: isActive ? "transparent" : C.panel }}>
-                      <td style={td}>
-                        {i === 0
-                          ? <><b style={{ color: C.text }}>{u.blockName}</b><span style={{ color: C.muted }}> / {u.name}</span></>
-                          : <span style={{ color: C.faint, paddingLeft: 10 }}>↳ {u.name}</span>}
-                      </td>
-                      <td style={td}>
-                        <span style={{ color: isActive ? C.text : C.muted, fontWeight: isActive ? 600 : 400 }}>{t.name}</span>
-                        {!isActive && period && <span style={{ fontSize: 10, color: C.lavender, marginLeft: 6, background: C.lavBg, borderRadius: 4, padding: "1px 5px" }}>{period}</span>}
-                      </td>
-                      <td style={td}>{fmt(Number(t.monthlyRent) || u.monthlyRent)}</td>
-                      <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{grossRent > 0 ? fmt(grossRent) : <span style={{ color: C.faint }}>—</span>}</td>
-                      <td style={{ ...td, color: C.rose, fontWeight: refund > 0 ? 600 : 400 }}>{refund > 0 ? `-${fmt(refund)}` : <span style={{ color: C.faint }}>—</span>}</td>
-                      <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
-                      <td style={{ ...td, fontWeight: 700, color: totalEarned > 0 ? C.sage : C.faint }}>{totalEarned > 0 ? fmt(totalEarned) : "—"}</td>
-                      <td style={{ ...td, color: balance > 0 ? C.rose : C.faint, fontWeight: balance > 0 ? 700 : 400 }}>{balance > 0 ? fmt(balance) : "—"}</td>
-                      <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{i === 0 && maintCost > 0 ? fmt(maintCost) : "—"}</td>
-                    </tr>
-                  );
+
+                units.forEach((u) => {
+                  const maintCost = maintenanceCostForUnit(u);
+                  if (u.tenants.length === 0) {
+                    blockRows.push(
+                      <tr key={u.uid}>
+                        <td style={td}><span style={{ color: C.faint, paddingLeft: 12 }}>↳ {u.name}</span></td>
+                        <td style={td}><span style={{ color: C.faint, fontStyle: "italic" }}>Vacant</span></td>
+                        <td style={td}>{fmt(u.monthlyRent)}</td>
+                        <td style={td} /><td style={td} /><td style={td} /><td style={td} /><td style={td} />
+                        <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{maintCost > 0 ? fmt(maintCost) : "—"}</td>
+                      </tr>
+                    );
+                    return;
+                  }
+
+                  const allPeriods = u.tenants.flatMap((t) => [
+                    t,
+                    ...(t.leaseHistory || []).map((h, hi) => ({
+                      ...h,
+                      tid: `${t.tid}-h${hi}`,
+                      name: t.name,
+                      leaseStatus: "ended",
+                      payments: [],
+                      refundAmount: 0,
+                    }))
+                  ]);
+
+                  allPeriods.forEach((t, i) => {
+                    const isActive  = t.leaseStatus === "active";
+                    const logTotal  = (t.payments || []).reduce((ps, p) => ps + (Number(p.amount) || 0), 0);
+                    const grossRent = logTotal > 0 ? logTotal : (Number(t.advanceAmount) > 0 ? Number(t.advanceAmount) : 0);
+                    const refund    = Number(t.refundAmount) || 0;
+                    const netRent   = Math.max(0, grossRent - refund);
+                    const depAmt    = t.depositAmount != null ? Number(t.depositAmount) : u.monthlyRent;
+                    const depPaid   = t.depositPaid ? depAmt : 0;
+                    const totalEarned = netRent + depPaid;
+                    const balance   = isActive ? (Number(t.balanceOwed) || 0) : 0;
+                    const sy = t.leaseStart ? new Date(t.leaseStart).getFullYear() : "";
+                    const ey = (t.leaseEnd || t.cancelDate) ? new Date(t.leaseEnd || t.cancelDate).getFullYear() : "";
+                    const period = sy && ey && sy !== ey ? `${sy}–${ey}` : `${sy}`;
+                    blockRows.push(
+                      <tr key={t.tid || `${u.uid}-${i}`} style={{ opacity: isActive ? 1 : 0.75, background: isActive ? "transparent" : C.panel }}>
+                        <td style={td}>
+                          {i === 0
+                            ? <span style={{ color: C.faint, paddingLeft: 12 }}>↳ {u.name}</span>
+                            : <span style={{ color: C.faint, paddingLeft: 22 }}>↳ {u.name}</span>}
+                        </td>
+                        <td style={td}>
+                          <span style={{ color: isActive ? C.text : C.muted, fontWeight: isActive ? 600 : 400 }}>{t.name}</span>
+                          {!isActive && period && <span style={{ fontSize: 10, color: C.lavender, marginLeft: 6, background: C.lavBg, borderRadius: 4, padding: "1px 5px" }}>{period}</span>}
+                        </td>
+                        <td style={td}>{fmt(Number(t.monthlyRent) || u.monthlyRent)}</td>
+                        <td style={{ ...td, color: C.teal, fontWeight: 600 }}>{grossRent > 0 ? fmt(grossRent) : <span style={{ color: C.faint }}>—</span>}</td>
+                        <td style={{ ...td, color: C.rose, fontWeight: refund > 0 ? 600 : 400 }}>{refund > 0 ? `-${fmt(refund)}` : <span style={{ color: C.faint }}>—</span>}</td>
+                        <td style={{ ...td, color: C.gold }}>{depPaid > 0 ? fmt(depPaid) : <span style={{ color: C.faint }}>—</span>}</td>
+                        <td style={{ ...td, fontWeight: 700, color: totalEarned > 0 ? C.sage : C.faint }}>{totalEarned > 0 ? fmt(totalEarned) : "—"}</td>
+                        <td style={{ ...td, color: balance > 0 ? C.rose : C.faint, fontWeight: balance > 0 ? 700 : 400 }}>{balance > 0 ? fmt(balance) : "—"}</td>
+                        <td style={{ ...td, color: maintCost > 0 ? C.rose : C.faint }}>{i === 0 && maintCost > 0 ? fmt(maintCost) : "—"}</td>
+                      </tr>
+                    );
+                  });
                 });
+
+                return blockRows;
               })}
             </tbody>
             {scopeUnits.length > 1 && (
@@ -213,13 +276,46 @@ export default function Dashboard({ totalRev, totalMonthlyRent, occupiedUnits, a
                   <td style={{ ...td, fontWeight: 700, color: C.gold }}>{fmt(scopeTotals.depPaid)}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.sage }}>{fmt(scopeTotals.grossRent - scopeTotals.totalRefunds + scopeTotals.depPaid)}</td>
                   <td style={{ ...td, fontWeight: 700, color: C.rose }}>{fmt(scopeUnits.reduce((s,u)=>{ const a=u.tenants.find(t=>t.leaseStatus==="active"); return s+(Number(a?.balanceOwed)||0); },0) || 0)}</td>
-                  <td style={{ ...td, fontWeight: 700, color: C.rose }}>{scopeTotals.maintCost > 0 ? fmt(scopeTotals.maintCost) : "—"}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.rose }}>{scopeMaintCost > 0 ? fmt(scopeMaintCost) : "—"}</td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
       </div>
+
+      {/* ── Recent Maintenance ── */}
+      {maint.length > 0 && (
+        <div className="app-card" style={card}>
+          <div style={cTitle}>Recent Maintenance Requests</div>
+          <div className="tbl-wrap">
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={th}>Location</th>
+                  <th style={th}>Type</th>
+                  <th style={th}>Description</th>
+                  <th style={th}>Reported</th>
+                  <th style={th}>Status</th>
+                  <th style={th}>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {maint.slice(0, 8).map((m) => (
+                  <tr key={m.id}>
+                    <td style={td}>{m.label}</td>
+                    <td style={td}>{m.type}</td>
+                    <td style={{ ...td, maxWidth: 220 }}>{m.description}</td>
+                    <td style={td}>{fmtDate(m.reportedDate)}</td>
+                    <td style={td}>{m.status}</td>
+                    <td style={td}>{fmt(m.cost || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Balance Owed by Tenants ── */}
       {balanceRows.length > 0 && (

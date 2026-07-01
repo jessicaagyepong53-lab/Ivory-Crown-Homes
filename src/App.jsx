@@ -5,7 +5,7 @@ import { TABS } from "./constants/options";
 import { fmt } from "./utils/formatters";
 import { today, yr, daysUntil, getLeaseStatus } from "./utils/helpers";
 import { fetchBlocks, createBlock, deleteBlock as apiDeleteBlock, addUnit as apiAddUnit, deleteUnit as apiDeleteUnit, addTenant as apiAddTenant, updateTenant as apiUpdateTenant } from "./api/blocks.js";
-import { fetchMaintenance, createMaintenance, updateMaintenance as apiUpdateMaintenance } from "./api/maintenance.js";
+import { fetchMaintenance, createMaintenance, updateMaintenance as apiUpdateMaintenance, deleteMaintenanceAttachment as apiDeleteMaintenanceAttachment, editMaintenance as apiEditMaintenance, deleteMaintenance as apiDeleteMaintenance } from "./api/maintenance.js";
 import { verifyToken, logout as apiLogout } from "./api/auth.js";
 import { useToast } from "./components/Toast";
 import LoadingSpinner   from "./components/LoadingSpinner.jsx";
@@ -202,15 +202,57 @@ export default function App() {
   }
 
   async function saveMaint(entry) {
-    const created = await createMaintenance(entry);
-    setMaint((prev) => [created, ...prev]);
-    toast("Maintenance request created.", "info");
+    try {
+      const created = await createMaintenance(entry);
+      setMaint((prev) => [created, ...prev]);
+      toast("Maintenance request created.", "info");
+    } catch (err) {
+      const message = err?.response?.data?.error || "Could not save maintenance request. Please try again.";
+      toast(message, "delete");
+      throw err;
+    }
   }
 
   async function updMaint(id, status) {
     const updated = await apiUpdateMaintenance(id, { status });
     setMaint((prev) => prev.map((m) => m.id === id ? updated : m));
     toast(`Maintenance status → ${status}.`, status === "Completed" ? "success" : "info");
+  }
+
+  async function deleteMaintAttachment(id, attachmentId) {
+    try {
+      const updated = await apiDeleteMaintenanceAttachment(id, attachmentId);
+      setMaint((prev) => prev.map((m) => m.id === id ? updated : m));
+      toast("Receipt/document removed.", "delete");
+    } catch (err) {
+      const message = err?.response?.data?.error || "Could not delete attachment.";
+      toast(message, "delete");
+      throw err;
+    }
+  }
+
+  async function editMaint(id, updates) {
+    try {
+      const updated = await apiEditMaintenance(id, updates);
+      setMaint((prev) => prev.map((m) => m.id === id ? updated : m));
+      toast("Maintenance entry updated.", "save");
+    } catch (err) {
+      const message = err?.response?.data?.error || "Could not update maintenance entry.";
+      toast(message, "delete");
+      throw err;
+    }
+  }
+
+  async function deleteMaint(id) {
+    try {
+      await apiDeleteMaintenance(id);
+      setMaint((prev) => prev.filter((m) => m.id !== id));
+      toast("Maintenance entry deleted.", "delete");
+    } catch (err) {
+      const message = err?.response?.data?.error || "Could not delete maintenance entry.";
+      toast(message, "delete");
+      throw err;
+    }
   }
 
   // ── Auth guard ─────────────────────────────────────────────────────────────────────
@@ -421,6 +463,9 @@ export default function App() {
             requireAuth={requireAuth}
             onUpdMaint={withAuth(updMaint)}
             onSaveMaint={withAuth(saveMaint)}
+            onDeleteAttachment={withAuth(deleteMaintAttachment)}
+            onEditMaint={withAuth(editMaint)}
+            onDeleteMaint={withAuth(deleteMaint)}
           />
         )}
 
