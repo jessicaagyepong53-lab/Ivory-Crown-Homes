@@ -6,6 +6,7 @@ import { txMaint } from '../utils/transform.js';
 import { parseMaintenanceReceipt } from '../utils/parseMaintenanceReceipt.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { broadcast } from '../socket.js';
+import { AppError, requireObjectId, requireNonEmptyString, requireOneOf } from '../utils/validators.js';
 
 const router = express.Router();
 const upload = multer({
@@ -29,7 +30,7 @@ function parsePayload(req) {
 // POST /api/maintenance/parse-receipt — OCR/parse one uploaded receipt file
 router.post('/maintenance/parse-receipt', verifyJWT, upload.single('file'), async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    if (!req.file) throw new AppError('No file provided.');
     const parsed = await parseMaintenanceReceipt(req.file.buffer, req.file.mimetype);
     res.json(parsed);
   } catch (err) { next(err); }
@@ -54,14 +55,13 @@ router.post('/maintenance', verifyJWT, upload.array('attachments', 5), async (re
     const blockId = blockIds[0] || payload.blockId || '';
     const commonAreaName = (payload.commonAreaName || '').trim();
 
-    if (!blockId || !payload.description) {
-      return res.status(400).json({ error: 'Block and description are required.' });
-    }
+    if (!blockId) throw new AppError('Please select a block.');
+    requireNonEmptyString(payload.description, 'Description');
     if (targetScope === 'unit' && !payload.unitId) {
-      return res.status(400).json({ error: 'Unit is required for unit-level requests.' });
+      throw new AppError('Unit is required for unit-level requests.');
     }
     if (targetScope === 'block' && !commonAreaName) {
-      return res.status(400).json({ error: 'Common area name is required for block-level requests.' });
+      throw new AppError('Common area name is required for block-level requests.');
     }
 
     const attachments = [];
@@ -100,6 +100,7 @@ router.post('/maintenance', verifyJWT, upload.array('attachments', 5), async (re
 // PUT /api/maintenance/:id
 router.put('/maintenance/:id', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.id, 'Maintenance ID');
     const updates = { ...req.body };
     if (Object.prototype.hasOwnProperty.call(updates, 'cost')) {
       updates.cost = Number(updates.cost) || 0;
@@ -123,28 +124,28 @@ router.put('/maintenance/:id', verifyJWT, async (req, res, next) => {
       updates.location = String(updates.location || '').trim();
     }
     if (updates.description != null) {
-      updates.description = String(updates.description).trim();
-      if (!updates.description) {
-        return res.status(400).json({ error: 'Description is required.' });
-      }
+      updates.description = requireNonEmptyString(updates.description, 'Description');
+    }
+    if (updates.status != null) {
+      requireOneOf(updates.status, ['Pending', 'In Progress', 'Completed', 'Cancelled'], 'Status');
     }
     if (updates.targetScope === 'block') {
       const commonAreaName = (updates.commonAreaName || '').trim();
       if (!commonAreaName) {
-        return res.status(400).json({ error: 'Common area name is required for block-level requests.' });
+        throw new AppError('Common area name is required for block-level requests.');
       }
       updates.commonAreaName = commonAreaName;
       updates.unitId = undefined;
     }
     if (updates.targetScope === 'unit') {
       if (!updates.unitId) {
-        return res.status(400).json({ error: 'Unit is required for unit-level requests.' });
+        throw new AppError('Unit is required for unit-level requests.');
       }
       updates.commonAreaName = undefined;
       updates.blockIds = updates.blockIds || (updates.blockId ? [updates.blockId] : []);
     }
     const entry = await Maintenance.findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!entry) return res.status(404).json({ error: 'Entry not found' });
+    if (!entry) throw new AppError('Entry not found', 404);
     res.json(txMaint(entry));
     broadcast('maintenance:changed', null);
   } catch (err) { next(err); }
@@ -154,14 +155,17 @@ router.put('/maintenance/:id', verifyJWT, async (req, res, next) => {
 // Open read (same access model as maintenance list).
 router.get('/maintenance/:id/attachments/:aid/file', async (req, res, next) => {
   try {
+    requireObjectId(req.params.id, 'Maintenance ID');
+    requireObjectId(req.params.aid, 'Attachment ID');
+
     const entry = await Maintenance.findById(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'Entry not found' });
+    if (!entry) throw new AppError('Entry not found', 404);
 
     const attachment = entry.attachments.id(req.params.aid);
-    if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+    if (!attachment) throw new AppError('Attachment not found', 404);
 
     const file = await DocFile.findById(attachment.fileId);
-    if (!file?.data) return res.status(404).json({ error: 'File not found' });
+    if (!file?.data) throw new AppError('File not found', 404);
 
     const dl = req.query.dl === '1';
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
@@ -175,11 +179,14 @@ router.get('/maintenance/:id/attachments/:aid/file', async (req, res, next) => {
 // DELETE /api/maintenance/:id/attachments/:aid — remove one receipt/document
 router.delete('/maintenance/:id/attachments/:aid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.id, 'Maintenance ID');
+    requireObjectId(req.params.aid, 'Attachment ID');
+
     const entry = await Maintenance.findById(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'Entry not found' });
+    if (!entry) throw new AppError('Entry not found', 404);
 
     const attachment = entry.attachments.id(req.params.aid);
-    if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+    if (!attachment) throw new AppError('Attachment not found', 404);
 
     const fileId = attachment.fileId;
     entry.attachments.pull(req.params.aid);
@@ -194,8 +201,10 @@ router.delete('/maintenance/:id/attachments/:aid', verifyJWT, async (req, res, n
 // DELETE /api/maintenance/:id — delete one maintenance entry and linked files
 router.delete('/maintenance/:id', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.id, 'Maintenance ID');
+
     const entry = await Maintenance.findById(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'Entry not found' });
+    if (!entry) throw new AppError('Entry not found', 404);
 
     const fileIds = (entry.attachments || []).map((a) => a.fileId).filter(Boolean);
     await Maintenance.findByIdAndDelete(req.params.id);

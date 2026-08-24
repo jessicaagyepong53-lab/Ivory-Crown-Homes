@@ -10,6 +10,7 @@ import { verifyJWT } from '../middleware/auth.js';
 import cloudinary from '../config/cloudinary.js';
 import { broadcast } from '../socket.js';
 import { parseLease } from '../utils/parseLease.js';
+import { AppError, requireObjectId } from '../utils/validators.js';
 
 const router = express.Router();
 const upload = multer({
@@ -20,7 +21,8 @@ const upload = multer({
 // POST /api/tenants/:tid/documents — upload file to Cloudinary, save metadata
 router.post('/tenants/:tid/documents', verifyJWT, upload.single('file'), async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    requireObjectId(req.params.tid, 'Tenant ID');
+    if (!req.file) throw new AppError('No file provided.');
 
     // Upload buffer to Cloudinary via stream
     const result = await new Promise((resolve, reject) => {
@@ -34,7 +36,7 @@ router.post('/tenants/:tid/documents', verifyJWT, upload.single('file'), async (
     const block = await Block.findOne({
       'units.tenants._id': new mongoose.Types.ObjectId(req.params.tid),
     });
-    if (!block) return res.status(404).json({ error: 'Tenant not found' });
+    if (!block) throw new AppError('Tenant not found', 404);
 
     let tenant = null;
     for (const unit of block.units) {
@@ -114,10 +116,12 @@ router.post('/tenants/:tid/documents', verifyJWT, upload.single('file'), async (
 // DELETE /api/documents/:did — remove from Cloudinary + DB
 router.delete('/documents/:did', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.did, 'Document ID');
+
     const block = await Block.findOne({
       'units.tenants.documents._id': new mongoose.Types.ObjectId(req.params.did),
     });
-    if (!block) return res.status(404).json({ error: 'Document not found' });
+    if (!block) throw new AppError('Document not found', 404);
 
     let removed = null;
     outer: for (const unit of block.units) {
@@ -149,17 +153,19 @@ router.delete('/documents/:did', verifyJWT, async (req, res, next) => {
 // Accepts JWT via Authorization header OR ?token= query param (for iframes).
 router.get('/documents/:did/file', async (req, res, next) => {
   try {
+    requireObjectId(req.params.did, 'Document ID');
+
     const token = req.headers.authorization?.startsWith('Bearer ')
       ? req.headers.authorization.slice(7)
       : req.query.token;
-    if (!token) return res.status(401).send('Unauthorized');
+    if (!token) throw new AppError('Unauthorized', 401);
     try { jwt.verify(token, process.env.JWT_SECRET); }
-    catch { return res.status(401).send('Invalid token'); }
+    catch { throw new AppError('Invalid or expired token', 401); }
 
     const block = await Block.findOne({
       'units.tenants.documents._id': new mongoose.Types.ObjectId(req.params.did),
     });
-    if (!block) return res.status(404).send('Document not found');
+    if (!block) throw new AppError('Document not found', 404);
 
     let doc = null;
     outer: for (const unit of block.units) {
@@ -168,7 +174,7 @@ router.get('/documents/:did/file', async (req, res, next) => {
         if (d) { doc = d; break outer; }
       }
     }
-    if (!doc) return res.status(404).send('Document not found');
+    if (!doc) throw new AppError('Document not found', 404);
 
     // ── New files: serve bytes directly from MongoDB ──────────────────────────
     if (doc.fileId) {
@@ -184,7 +190,7 @@ router.get('/documents/:did/file', async (req, res, next) => {
     }
 
     // ── Old files (no fileId): tell user to delete & re-upload ───────────────
-    return res.status(404).send('File not found — please delete this document and re-upload it.');
+    throw new AppError('File not found — please delete this document and re-upload it.', 404);
   } catch (err) { next(err); }
 });
 

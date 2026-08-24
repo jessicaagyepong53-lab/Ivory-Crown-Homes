@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { C } from "../constants/colors";
-import { changePin } from "../api/auth.js";
+import { changePin, getSecurityQuestion, setSecurityQuestion } from "../api/auth.js";
 import { fetchTrash, restoreTrashItem, bulkRestoreTrash, deleteTrashItem, bulkDeleteTrash } from "../api/trash.js";
 import { iSt, lSt, card } from "../styles/shared";
 import Btn from "../components/ui/Btn";
@@ -35,6 +35,15 @@ export default function Settings({ requireAuth, isAuthenticated }) {
   const [saved,      setSaved]      = useState(false);
   const [saving,     setSaving]     = useState(false);
 
+  // Security question state
+  const [currentQuestion, setCurrentQuestion] = useState(null); // null = not loaded/none set
+  const [qLoading,   setQLoading]   = useState(true);
+  const [qQuestion,  setQQuestion]  = useState("");
+  const [qAnswer,    setQAnswer]    = useState("");
+  const [qError,     setQError]     = useState("");
+  const [qSaved,     setQSaved]     = useState(false);
+  const [qSaving,    setQSaving]    = useState(false);
+
   // Trash state
   const [trash,        setTrash]        = useState([]);
   const [trashLoading, setTrashLoading] = useState(false);
@@ -48,7 +57,20 @@ export default function Settings({ requireAuth, isAuthenticated }) {
     finally { setTrashLoading(false); }
   }
 
+  async function loadSecurityQuestion() {
+    setQLoading(true);
+    try {
+      const { question } = await getSecurityQuestion();
+      setCurrentQuestion(question);
+    } catch {
+      setCurrentQuestion(""); // none configured yet
+    } finally {
+      setQLoading(false);
+    }
+  }
+
   useEffect(() => { if (isAuthenticated) loadTrash(); }, [isAuthenticated]);
+  useEffect(() => { loadSecurityQuestion(); }, []);
 
   async function handleSave() {
     setError("");
@@ -66,6 +88,26 @@ export default function Settings({ requireAuth, isAuthenticated }) {
       setError(err.response?.data?.error || "Failed to update PIN. Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveQuestion() {
+    setQError("");
+    setQSaved(false);
+    if (!qQuestion.trim()) { setQError("Enter a question."); return; }
+    if (!qAnswer.trim())   { setQError("Enter an answer."); return; }
+    setQSaving(true);
+    try {
+      await setSecurityQuestion(qQuestion.trim(), qAnswer.trim());
+      setQSaved(true);
+      setCurrentQuestion(qQuestion.trim());
+      setQQuestion("");
+      setQAnswer("");
+      setTimeout(() => setQSaved(false), 5000);
+    } catch (err) {
+      setQError(err.response?.data?.error || "Failed to save security question. Please try again.");
+    } finally {
+      setQSaving(false);
     }
   }
 
@@ -130,52 +172,128 @@ export default function Settings({ requireAuth, isAuthenticated }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: C.teal, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 }}>
           🔑 Change Access PIN
         </div>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 6, lineHeight: 1.7 }}>
-          Set a new PIN (4–8 digits). <b style={{ color: C.text }}>No current PIN is required</b> — use this page if you have forgotten your PIN.
+
+        {isAuthenticated ? (
+          <>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 6, lineHeight: 1.7 }}>
+              Set a new PIN (4–8 digits) for this session's login.
+            </p>
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 22, background: C.panel, borderRadius: 8, padding: "8px 12px", display: "inline-block" }}>
+              PIN is stored securely on the server (bcrypt hashed).
+            </div>
+
+            <div className="pin-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
+              <div>
+                <label style={lSt}>New PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  style={iSt}
+                  placeholder="4–8 digits"
+                  value={newPin}
+                  onChange={(e) => { setSaved(false); setError(""); setNewPin(e.target.value.replace(/\D/g, "").slice(0, 8)); }}
+                />
+              </div>
+              <div>
+                <label style={lSt}>Confirm New PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  style={iSt}
+                  placeholder="Re-enter new PIN"
+                  value={confirmPin}
+                  onChange={(e) => { setSaved(false); setError(""); setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 8)); }}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ fontSize: 12, color: C.rose, fontWeight: 600, marginBottom: 14, padding: "8px 12px", background: C.roseBg, borderRadius: 7, border: `1px solid ${C.rose}33` }}>
+                {error}
+              </div>
+            )}
+            {saved && (
+              <div style={{ fontSize: 12, color: C.sage, fontWeight: 600, marginBottom: 14, padding: "8px 12px", background: C.sageBg, borderRadius: 7, border: `1px solid ${C.sage}33` }}>
+                ✓ PIN updated successfully. Use your new PIN next time you log in.
+              </div>
+            )}
+
+            <Btn onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save New PIN"}</Btn>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "20px 10px" }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>🔒</div>
+            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7, marginBottom: 18 }}>
+              You need to be logged in to change your PIN.
+              <br />
+              Forgotten it entirely? Use <strong style={{ color: C.text }}>"Forgot PIN?"</strong> on the login screen — it uses your security question instead.
+            </p>
+            <Btn onClick={() => requireAuth(() => {})}>Log In</Btn>
+          </div>
+        )}
+      </div>
+
+      {/* Security question card */}
+      <div className="app-card" style={{ ...card, maxWidth: 500, marginTop: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 }}>
+          🛟 PIN Recovery — Security Question
+        </div>
+        <p style={{ fontSize: 13, color: C.muted, marginBottom: 14, lineHeight: 1.7 }}>
+          Set this up now so you can reset your PIN yourself if you ever forget it, without anyone needing to touch the database.
         </p>
-        <div style={{ fontSize: 12, color: C.faint, marginBottom: 22, background: C.panel, borderRadius: 8, padding: "8px 12px", display: "inline-block" }}>
-          PIN is stored securely on the server (bcrypt hashed).
-        </div>
 
-        <div className="pin-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
-          <div>
-            <label style={lSt}>New PIN</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={8}
-              style={iSt}
-              placeholder="4–8 digits"
-              value={newPin}
-              onChange={(e) => { setSaved(false); setError(""); setNewPin(e.target.value.replace(/\D/g, "").slice(0, 8)); }}
-            />
-          </div>
-          <div>
-            <label style={lSt}>Confirm New PIN</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={8}
-              style={iSt}
-              placeholder="Re-enter new PIN"
-              value={confirmPin}
-              onChange={(e) => { setSaved(false); setError(""); setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 8)); }}
-            />
-          </div>
-        </div>
-
-        {error && (
-          <div style={{ fontSize: 12, color: C.rose, fontWeight: 600, marginBottom: 14, padding: "8px 12px", background: C.roseBg, borderRadius: 7, border: `1px solid ${C.rose}33` }}>
-            {error}
-          </div>
-        )}
-        {saved && (
-          <div style={{ fontSize: 12, color: C.sage, fontWeight: 600, marginBottom: 14, padding: "8px 12px", background: C.sageBg, borderRadius: 7, border: `1px solid ${C.sage}33` }}>
-            ✓ PIN updated successfully. Use your new PIN next time you log in to edit.
+        {!qLoading && (
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 18, background: C.panel, borderRadius: 8, padding: "8px 12px" }}>
+            {currentQuestion
+              ? <>Current question: <b style={{ color: C.text }}>{currentQuestion}</b></>
+              : <span style={{ color: C.rose }}>No recovery question set yet — PIN reset is unavailable until you set one.</span>}
           </div>
         )}
 
-        <Btn onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save New PIN"}</Btn>
+        {isAuthenticated ? (
+          <>
+            <div style={{ marginBottom: 13 }}>
+              <label style={lSt}>{currentQuestion ? "New Question" : "Question"}</label>
+              <input
+                type="text"
+                style={iSt}
+                placeholder="e.g. What street did you grow up on?"
+                value={qQuestion}
+                onChange={(e) => { setQSaved(false); setQError(""); setQQuestion(e.target.value); }}
+              />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={lSt}>Answer</label>
+              <input
+                type="text"
+                style={iSt}
+                placeholder="Answer (not case-sensitive)"
+                value={qAnswer}
+                onChange={(e) => { setQSaved(false); setQError(""); setQAnswer(e.target.value); }}
+              />
+            </div>
+
+            {qError && (
+              <div style={{ fontSize: 12, color: C.rose, fontWeight: 600, marginBottom: 14, padding: "8px 12px", background: C.roseBg, borderRadius: 7, border: `1px solid ${C.rose}33` }}>
+                {qError}
+              </div>
+            )}
+            {qSaved && (
+              <div style={{ fontSize: 12, color: C.sage, fontWeight: 600, marginBottom: 14, padding: "8px 12px", background: C.sageBg, borderRadius: 7, border: `1px solid ${C.sage}33` }}>
+                ✓ Security question saved.
+              </div>
+            )}
+
+            <Btn onClick={handleSaveQuestion} disabled={qSaving}>{qSaving ? "Saving…" : (currentQuestion ? "Update Question" : "Set Question")}</Btn>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "10px 10px 4px" }}>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>Log in to set or change your recovery question.</p>
+            <Btn onClick={() => requireAuth(() => {})}>Log In</Btn>
+          </div>
+        )}
       </div>
 
       {/* Info card */}
@@ -188,7 +306,8 @@ export default function Settings({ requireAuth, isAuthenticated }) {
             ["👁  View", "Anyone can browse the dashboard, properties, and all data without a PIN."],
             ["✏  Edit",  "Adding tenants, ending leases, logging maintenance, and any data change requires a PIN login."],
             ["🔒 Session", "Once logged in, edits are unlocked for the current session. Closing or refreshing the page resets this."],
-            ["⚙  Reset",  "Forgotten your PIN? Set a new one right here on this Settings page — no old PIN needed."],
+            ["🚫 Lockout", "3 incorrect PIN attempts locks login for 15 minutes. A second lockout locks it for a full 24 hours. Security-question attempts always lock for just 15 minutes, so PIN recovery stays available."],
+            ["⚙  Reset",  "Forgotten your PIN? Use \"Forgot PIN?\" on the login screen and answer your security question."],
           ].map(([label, text]) => (
             <div key={label} className="settings-info-item" style={{ display: "flex", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
               <span style={{ fontWeight: 700, color: C.muted, minWidth: 90 }}>{label}</span>
@@ -316,4 +435,3 @@ export default function Settings({ requireAuth, isAuthenticated }) {
     </>
   );
 }
-

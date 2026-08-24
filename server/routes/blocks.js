@@ -6,6 +6,7 @@ import { txBlock } from '../utils/transform.js';
 import { verifyJWT } from '../middleware/auth.js';
 import cloudinary from '../config/cloudinary.js';
 import { broadcast } from '../socket.js';
+import { AppError, requireObjectId, requireNonEmptyString, requirePositiveNumber, requireDateString, requireOneOf } from '../utils/validators.js';
 
 const router = express.Router();
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
@@ -23,9 +24,11 @@ router.get('/blocks', async (req, res, next) => {
 // POST /api/blocks
 router.post('/blocks', verifyJWT, async (req, res, next) => {
   try {
+    const name = requireNonEmptyString(req.body.name, 'Block name');
+    const type = req.body.type ? requireOneOf(req.body.type, ['block', 'standalone'], 'Type') : 'block';
     const block = await Block.create({
-      name:    req.body.name,
-      type:    req.body.type    || 'block',
+      name,
+      type,
       address: req.body.address || '',
       units:   [],
     });
@@ -37,10 +40,11 @@ router.post('/blocks', verifyJWT, async (req, res, next) => {
 // PUT /api/blocks/:bid
 router.put('/blocks/:bid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.bid, 'Block ID');
     const block = await Block.findById(req.params.bid);
-    if (!block) return res.status(404).json({ error: 'Block not found' });
-    if (req.body.name    !== undefined) block.name    = req.body.name;
-    if (req.body.type    !== undefined) block.type    = req.body.type;
+    if (!block) throw new AppError('Block not found', 404);
+    if (req.body.name    !== undefined) block.name    = requireNonEmptyString(req.body.name, 'Block name');
+    if (req.body.type    !== undefined) block.type    = requireOneOf(req.body.type, ['block', 'standalone'], 'Type');
     if (req.body.address !== undefined) block.address = req.body.address;
     await block.save();
     res.json(txBlock(block));
@@ -51,8 +55,9 @@ router.put('/blocks/:bid', verifyJWT, async (req, res, next) => {
 // DELETE /api/blocks/:bid — soft-delete to trash
 router.delete('/blocks/:bid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.bid, 'Block ID');
     const block = await Block.findById(req.params.bid);
-    if (!block) return res.status(404).json({ error: 'Block not found' });
+    if (!block) throw new AppError('Block not found', 404);
     // Move to trash (Cloudinary files kept until permanently deleted)
     await Trash.create({
       type: 'block',
@@ -72,12 +77,14 @@ router.delete('/blocks/:bid', verifyJWT, async (req, res, next) => {
 // POST /api/blocks/:bid/units
 router.post('/blocks/:bid/units', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.bid, 'Block ID');
+    const name = requireNonEmptyString(req.body.name, 'Unit name');
     const block = await Block.findById(req.params.bid);
-    if (!block) return res.status(404).json({ error: 'Block not found' });
+    if (!block) throw new AppError('Block not found', 404);
     block.units.push({
-      name: req.body.name,
+      name,
       type: req.body.type,
-      monthlyRent: req.body.monthlyRent || 0,
+      monthlyRent: Number(req.body.monthlyRent) || 0,
       tenants: [],
     });
     await block.save();
@@ -89,12 +96,13 @@ router.post('/blocks/:bid/units', verifyJWT, async (req, res, next) => {
 // PUT /api/units/:uid
 router.put('/units/:uid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.uid, 'Unit ID');
     const block = await Block.findOne({ 'units._id': new mongoose.Types.ObjectId(req.params.uid) });
-    if (!block) return res.status(404).json({ error: 'Unit not found' });
+    if (!block) throw new AppError('Unit not found', 404);
     const unit = block.units.id(req.params.uid);
-    if (req.body.name !== undefined)        unit.name = req.body.name;
-    if (req.body.type !== undefined)        unit.type = req.body.type;
-    if (req.body.monthlyRent !== undefined) unit.monthlyRent = req.body.monthlyRent;
+    if (req.body.name        !== undefined) unit.name        = requireNonEmptyString(req.body.name, 'Unit name');
+    if (req.body.type        !== undefined) unit.type        = req.body.type;
+    if (req.body.monthlyRent !== undefined) unit.monthlyRent = requirePositiveNumber(req.body.monthlyRent, 'Monthly rent');
     await block.save();
     res.json(txBlock(block)); // PUT unit
     broadcast('blocks:changed', null);
@@ -104,8 +112,9 @@ router.put('/units/:uid', verifyJWT, async (req, res, next) => {
 // DELETE /api/units/:uid — soft-delete to trash
 router.delete('/units/:uid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.uid, 'Unit ID');
     const block = await Block.findOne({ 'units._id': new mongoose.Types.ObjectId(req.params.uid) });
-    if (!block) return res.status(404).json({ error: 'Unit not found' });
+    if (!block) throw new AppError('Unit not found', 404);
     const unit = block.units.id(req.params.uid);
     // Move to trash
     await Trash.create({
@@ -128,8 +137,10 @@ router.delete('/units/:uid', verifyJWT, async (req, res, next) => {
 // POST /api/units/:uid/tenants
 router.post('/units/:uid/tenants', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.uid, 'Unit ID');
+    requireNonEmptyString(req.body.name, 'Tenant name');
     const block = await Block.findOne({ 'units._id': new mongoose.Types.ObjectId(req.params.uid) });
-    if (!block) return res.status(404).json({ error: 'Unit not found' });
+    if (!block) throw new AppError('Unit not found', 404);
     const unit = block.units.id(req.params.uid);
     const { tid, ...tenantData } = req.body; // strip client-generated tid
     // Auto-end any currently active tenant before adding the new one
@@ -151,8 +162,9 @@ router.post('/units/:uid/tenants', verifyJWT, async (req, res, next) => {
 // PUT /api/tenants/:tid
 router.put('/tenants/:tid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.tid, 'Tenant ID');
     const block = await Block.findOne({ 'units.tenants._id': new mongoose.Types.ObjectId(req.params.tid) });
-    if (!block) return res.status(404).json({ error: 'Tenant not found' });
+    if (!block) throw new AppError('Tenant not found', 404);
     let tenant = null;
     for (const unit of block.units) {
       tenant = unit.tenants.id(req.params.tid);
@@ -161,7 +173,7 @@ router.put('/tenants/:tid', verifyJWT, async (req, res, next) => {
     const { tid, documents, _id, ...updates } = req.body;
     // Coerce number fields sent as strings
     for (const f of ['monthlyRent', 'advanceMonths', 'advanceAmount', 'depositAmount', 'balanceOwed', 'refundAmount']) {
-      if (updates[f] != null) updates[f] = Number(updates[f]);
+      if (updates[f] != null) updates[f] = requirePositiveNumber(updates[f], f);
     }
     Object.assign(tenant, updates);
     // Keep unit.monthlyRent in sync
@@ -179,8 +191,9 @@ router.put('/tenants/:tid', verifyJWT, async (req, res, next) => {
 // DELETE /api/tenants/:tid — soft-delete to trash
 router.delete('/tenants/:tid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.tid, 'Tenant ID');
     const block = await Block.findOne({ 'units.tenants._id': new mongoose.Types.ObjectId(req.params.tid) });
-    if (!block) return res.status(404).json({ error: 'Tenant not found' });
+    if (!block) throw new AppError('Tenant not found', 404);
     let unit = null, tenant = null;
     for (const u of block.units) {
       const t = u.tenants.id(req.params.tid);
@@ -206,18 +219,21 @@ router.delete('/tenants/:tid', verifyJWT, async (req, res, next) => {
 // POST /api/tenants/:tid/payments — record a payment
 router.post('/tenants/:tid/payments', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.tid, 'Tenant ID');
+    const amount = requirePositiveNumber(req.body.amount, 'Amount');
+    if (amount <= 0) throw new AppError('Amount must be greater than zero.');
+    const date = requireDateString(req.body.date, 'Date');
+
     const block = await Block.findOne({ 'units.tenants._id': new mongoose.Types.ObjectId(req.params.tid) });
-    if (!block) return res.status(404).json({ error: 'Tenant not found' });
+    if (!block) throw new AppError('Tenant not found', 404);
     let tenant = null;
     for (const unit of block.units) {
       tenant = unit.tenants.id(req.params.tid);
       if (tenant) break;
     }
-    const { amount, date, note } = req.body;
-    if (!amount || !date) return res.status(400).json({ error: 'amount and date are required' });
-    tenant.payments.push({ amount: Number(amount), date, note: note || '' });
+    tenant.payments.push({ amount, date, note: req.body.note || '' });
     // Auto-reduce balanceOwed by the payment amount (floor at 0)
-    tenant.balanceOwed = Math.max(0, (Number(tenant.balanceOwed) || 0) - Number(amount));
+    tenant.balanceOwed = Math.max(0, (Number(tenant.balanceOwed) || 0) - amount);
     // Keep lastPaymentDate / lastPaymentAmount in sync with most recent entry
     const sorted = [...tenant.payments].sort((a, b) => (a.date > b.date ? -1 : 1));
     tenant.lastPaymentAmount = sorted[0].amount;
@@ -231,15 +247,17 @@ router.post('/tenants/:tid/payments', verifyJWT, async (req, res, next) => {
 // DELETE /api/tenants/:tid/payments/:pid — remove a payment
 router.delete('/tenants/:tid/payments/:pid', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.tid, 'Tenant ID');
+    requireObjectId(req.params.pid, 'Payment ID');
     const block = await Block.findOne({ 'units.tenants._id': new mongoose.Types.ObjectId(req.params.tid) });
-    if (!block) return res.status(404).json({ error: 'Tenant not found' });
+    if (!block) throw new AppError('Tenant not found', 404);
     let tenant = null;
     for (const unit of block.units) {
       tenant = unit.tenants.id(req.params.tid);
       if (tenant) break;
     }
     const removedPayment = tenant.payments.id(req.params.pid);
-    if (!removedPayment) return res.status(404).json({ error: 'Payment not found' });
+    if (!removedPayment) throw new AppError('Payment not found', 404);
     // Restore balanceOwed by the removed payment amount
     tenant.balanceOwed = (Number(tenant.balanceOwed) || 0) + Number(removedPayment.amount);
     tenant.payments.pull(req.params.pid);
@@ -261,8 +279,12 @@ router.delete('/tenants/:tid/payments/:pid', verifyJWT, async (req, res, next) =
 // POST /api/tenants/:tid/renew — archive current lease period, apply new one
 router.post('/tenants/:tid/renew', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.tid, 'Tenant ID');
+    requireDateString(req.body.leaseStart, 'Lease start date');
+    if (req.body.leaseEnd) requireDateString(req.body.leaseEnd, 'Lease end date');
+
     const block = await Block.findOne({ 'units.tenants._id': new mongoose.Types.ObjectId(req.params.tid) });
-    if (!block) return res.status(404).json({ error: 'Tenant not found' });
+    if (!block) throw new AppError('Tenant not found', 404);
     let tenant = null;
     for (const unit of block.units) {
       tenant = unit.tenants.id(req.params.tid);
@@ -292,14 +314,14 @@ router.post('/tenants/:tid/renew', verifyJWT, async (req, res, next) => {
     tenant.leaseStart     = req.body.leaseStart;
     tenant.leaseEnd       = req.body.leaseEnd       || null;
     tenant.depositPaid    = req.body.depositPaid    ?? false;
-    tenant.depositAmount  = req.body.depositAmount  != null ? Number(req.body.depositAmount)  : 0;
-    tenant.monthlyRent    = req.body.monthlyRent    != null ? Number(req.body.monthlyRent)    : tenant.monthlyRent;
-    tenant.advanceMonths  = req.body.advanceMonths  != null ? Number(req.body.advanceMonths)  : 0;
+    tenant.depositAmount  = req.body.depositAmount  != null ? requirePositiveNumber(req.body.depositAmount, 'Deposit amount')  : 0;
+    tenant.monthlyRent    = req.body.monthlyRent    != null ? requirePositiveNumber(req.body.monthlyRent, 'Monthly rent')    : tenant.monthlyRent;
+    tenant.advanceMonths  = req.body.advanceMonths  != null ? requirePositiveNumber(req.body.advanceMonths, 'Advance months')  : 0;
     tenant.advanceAmount  = req.body.advanceMonths && tenant.monthlyRent
       ? Number(req.body.advanceMonths) * tenant.monthlyRent
-      : (req.body.advanceAmount != null ? Number(req.body.advanceAmount) : 0);
-    tenant.balanceOwed         = req.body.balanceOwed    != null ? Number(req.body.balanceOwed)    : 0;
-    tenant.lastPaymentAmount   = req.body.lastPaymentAmount != null ? Number(req.body.lastPaymentAmount) : (tenant.lastPaymentAmount || 0);
+      : (req.body.advanceAmount != null ? requirePositiveNumber(req.body.advanceAmount, 'Advance amount') : 0);
+    tenant.balanceOwed         = req.body.balanceOwed    != null ? requirePositiveNumber(req.body.balanceOwed, 'Balance owed')    : 0;
+    tenant.lastPaymentAmount   = req.body.lastPaymentAmount != null ? requirePositiveNumber(req.body.lastPaymentAmount, 'Last payment amount') : (tenant.lastPaymentAmount || 0);
     tenant.lastPaymentDate     = req.body.lastPaymentDate   ?? tenant.lastPaymentDate ?? null;
     tenant.leaseStatus    = 'active';
     // Sync unit monthlyRent

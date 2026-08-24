@@ -5,6 +5,7 @@ import Block from '../models/Block.js';
 import cloudinary from '../config/cloudinary.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { broadcast } from '../socket.js';
+import { AppError, requireObjectId, requireObjectIdArray } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -34,13 +35,13 @@ async function restoreOne(item) {
     await Block.collection.insertOne(item.data);
   } else if (item.type === 'unit') {
     const block = await Block.findById(item.parentBlockId);
-    if (!block) throw Object.assign(new Error('Parent block no longer exists'), { status: 404 });
+    if (!block) throw new AppError('Parent block no longer exists', 404);
     await Block.updateOne({ _id: block._id }, { $push: { units: item.data } });
   } else if (item.type === 'tenant') {
     const block = await Block.findById(item.parentBlockId);
-    if (!block) throw Object.assign(new Error('Parent block no longer exists'), { status: 404 });
+    if (!block) throw new AppError('Parent block no longer exists', 404);
     const unit = block.units.id(item.parentUnitId);
-    if (!unit) throw Object.assign(new Error('Parent unit no longer exists'), { status: 404 });
+    if (!unit) throw new AppError('Parent unit no longer exists', 404);
     await Block.updateOne(
       { _id: block._id, 'units._id': new mongoose.Types.ObjectId(item.parentUnitId) },
       { $push: { 'units.$.tenants': item.data } }
@@ -65,7 +66,7 @@ router.get('/trash', verifyJWT, async (req, res, next) => {
 // POST /api/trash/restore — bulk restore (must come BEFORE /:id routes)
 router.post('/trash/restore', verifyJWT, async (req, res, next) => {
   try {
-    const { ids } = req.body;
+    const ids = requireObjectIdArray(req.body.ids, 'Trash item IDs');
     const items = await Trash.find({ _id: { $in: ids } });
     for (const item of items) {
       await restoreOne(item);
@@ -79,8 +80,9 @@ router.post('/trash/restore', verifyJWT, async (req, res, next) => {
 // POST /api/trash/:id/restore — single restore
 router.post('/trash/:id/restore', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.id, 'Trash item ID');
     const item = await Trash.findById(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Trash item not found' });
+    if (!item) throw new AppError('Trash item not found', 404);
     await restoreOne(item);
     await item.deleteOne();
     broadcast('blocks:changed', null);
@@ -91,7 +93,7 @@ router.post('/trash/:id/restore', verifyJWT, async (req, res, next) => {
 // DELETE /api/trash/bulk — bulk permanent delete (must come BEFORE /:id)
 router.delete('/trash/bulk', verifyJWT, async (req, res, next) => {
   try {
-    const { ids } = req.body;
+    const ids = requireObjectIdArray(req.body.ids, 'Trash item IDs');
     const items = await Trash.find({ _id: { $in: ids } });
     for (const item of items) await purgeCloudinary(item.type, item.data);
     await Trash.deleteMany({ _id: { $in: ids } });
@@ -102,8 +104,9 @@ router.delete('/trash/bulk', verifyJWT, async (req, res, next) => {
 // DELETE /api/trash/:id — single permanent delete
 router.delete('/trash/:id', verifyJWT, async (req, res, next) => {
   try {
+    requireObjectId(req.params.id, 'Trash item ID');
     const item = await Trash.findById(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Trash item not found' });
+    if (!item) throw new AppError('Trash item not found', 404);
     await purgeCloudinary(item.type, item.data);
     await item.deleteOne();
     res.json({ ok: true });
